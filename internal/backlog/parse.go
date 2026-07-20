@@ -442,12 +442,25 @@ func parseBlockerHead(head, section string) *Blocker {
 	if id := parseID(head); id != nil {
 		b.ID = *id
 	}
+	// Anchor on the trailing "opened <ts>" field (like parseDoneEntry anchors on
+	// its last field) so a title that itself contains " — " still parses: the
+	// title is everything between the id and the opened field.
 	parts := strings.Split(head, emDash)
-	if len(parts) >= 2 {
-		b.Title = strings.TrimSpace(parts[1])
+	openedIdx := -1
+	for i := len(parts) - 1; i >= 1; i-- {
+		if strings.HasPrefix(strings.TrimSpace(parts[i]), "opened ") {
+			openedIdx = i
+			break
+		}
 	}
-	if len(parts) >= 3 {
-		b.Opened = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(parts[2]), "opened "))
+	switch {
+	case openedIdx >= 1:
+		b.Opened = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(parts[openedIdx]), "opened "))
+		if openedIdx >= 2 {
+			b.Title = strings.TrimSpace(strings.Join(parts[1:openedIdx], emDash))
+		}
+	case len(parts) >= 2:
+		b.Title = strings.TrimSpace(strings.Join(parts[1:], emDash)) // no "opened" field
 	}
 	return b
 }
@@ -460,8 +473,13 @@ func parseBlockerHead(head, section string) *Blocker {
 func computeBadges(cards []Card, blockers []Blocker) {
 	blocked := map[string]bool{}
 	for _, bl := range blockers {
-		if bl.Open && bl.TaskRaw != "" {
-			blocked[strings.ToUpper(strings.TrimSpace(bl.TaskRaw))] = true
+		// Normalize the affected-task id: upper-case (case-insensitive join, per
+		// the D2 route-key decision) then take the leading id token, so trailing
+		// text like "DEMO-2 (importer path)" still matches.
+		if bl.Open {
+			if id := parseID(strings.ToUpper(bl.TaskRaw)); id != nil {
+				blocked[id.Raw] = true
+			}
 		}
 	}
 	for i := range cards {

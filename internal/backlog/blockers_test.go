@@ -43,6 +43,32 @@ func TestParseBlockers(t *testing.T) {
 	}
 }
 
+func TestParseBlockerHeadEmDashTitle(t *testing.T) {
+	b := parseBlockerHead("BLOCKER-020 — Fix the thing — and another clause — opened 2026-07-20 12:34", "Open")
+	if b.Title != "Fix the thing — and another clause" {
+		t.Errorf("title = %q, want the full em-dashed title", b.Title)
+	}
+	if b.Opened != "2026-07-20 12:34" {
+		t.Errorf("opened = %q, want 2026-07-20 12:34", b.Opened)
+	}
+	if !b.Open {
+		t.Error("want Open")
+	}
+	// No "opened" field: whole tail is the title.
+	if b2 := parseBlockerHead("BLOCKER-021 — just a title", "Resolved"); b2.Title != "just a title" || b2.Opened != "" {
+		t.Errorf("no-opened head: title=%q opened=%q", b2.Title, b2.Opened)
+	}
+}
+
+func TestBadgeJoinTolerant(t *testing.T) {
+	cards := []Card{{ID: &ID{Namespace: "DEMO", Number: 2, Raw: "DEMO-2"}, Column: ColInProgress}}
+	// lower-case + trailing text after the id must still join.
+	computeBadges(cards, []Blocker{{TaskRaw: "demo-2 (importer path)", Open: true}})
+	if !hasBadge(&cards[0], "blocked") {
+		t.Errorf("case-insensitive + trailing-text join should mark DEMO-2 blocked; badges=%+v", cards[0].Badges)
+	}
+}
+
 func hasBadge(c *Card, kind string) bool {
 	for _, bg := range c.Badges {
 		if bg.Kind == kind {
