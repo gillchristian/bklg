@@ -110,7 +110,11 @@ func splitSections(md string) []section {
 // --- id / title -------------------------------------------------------------
 
 func parseID(s string) *ID {
-	m := idRe.FindStringSubmatch(strings.TrimSpace(s))
+	// Strip leading markdown decoration so an id written as **WI-8 — …** or
+	// `TRACK-1` is still recognized (real instances decorate ids; spec §2's
+	// skeleton does not).
+	s = strings.TrimLeft(strings.TrimSpace(s), "*`_ ")
+	m := idRe.FindStringSubmatch(s)
 	if m == nil {
 		return nil
 	}
@@ -267,6 +271,27 @@ func parseDone(md string) ([]Card, []string) {
 		if sec.name != "Completed" {
 			continue
 		}
+		// Two real-world shapes: the skeleton's "- <ID> — … — …" bullets, and the
+		// "### <ID> — <title>" + prose-body headings some instances use. A section
+		// with any "### " line is heading-style (its body may contain "- " list
+		// lines, which must not be mistaken for bullet entries).
+		headingStyle := false
+		for _, ln := range sec.lines {
+			if strings.HasPrefix(ln, "### ") {
+				headingStyle = true
+				break
+			}
+		}
+		if headingStyle {
+			for _, block := range splitBlocks(sec.lines, "### ") {
+				card, warn := parseDoneHeading(block)
+				cards = append(cards, card)
+				if warn != "" {
+					warnings = append(warnings, warn)
+				}
+			}
+			continue
+		}
 		for _, ln := range sec.lines {
 			t := strings.TrimSpace(ln)
 			if !strings.HasPrefix(t, "- ") {
@@ -280,6 +305,62 @@ func parseDone(md string) ([]Card, []string) {
 		}
 	}
 	return cards, warnings
+}
+
+// parseDoneHeading parses a "### <ID> — <title>" DONE entry whose body carries a
+// "**Completed:** <date> · **PR:** #N · **Journal:** …" line plus a prose summary.
+func parseDoneHeading(lines []string) (Card, string) {
+	id, title := parseIDTitle(strings.TrimPrefix(lines[0], "### "))
+	body := strings.Join(lines[1:], "\n")
+	rec := &DoneRecord{
+		Date:           fieldAfter(body, "**Completed:**"),
+		DeliveryRecord: prPrefixed(fieldAfter(body, "**PR:**")),
+		JournalPointer: fieldAfter(body, "**Journal:**"),
+		Summary:        doneSummary(body),
+	}
+	card := Card{ID: id, Title: title, Column: ColDone, Raw: strings.Join(lines, "\n"), Done: rec}
+	if id == nil {
+		return card, "DONE heading without a parseable id: " + strings.TrimSpace(lines[0])
+	}
+	return card, ""
+}
+
+// fieldAfter returns the text after a "**Marker:**" up to the next " · " field
+// separator or end of line (the metadata line packs several fields with " · ").
+func fieldAfter(body, marker string) string {
+	i := strings.Index(body, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := body[i+len(marker):]
+	if j := strings.IndexByte(rest, '\n'); j >= 0 {
+		rest = rest[:j]
+	}
+	if j := strings.Index(rest, " · "); j >= 0 {
+		rest = rest[:j]
+	}
+	return strings.TrimSpace(rest)
+}
+
+// doneSummary is the prose body with the metadata line(s) removed.
+func doneSummary(body string) string {
+	var out []string
+	for _, ln := range strings.Split(body, "\n") {
+		t := strings.TrimSpace(ln)
+		if t == "" || strings.HasPrefix(t, "**Completed:**") || strings.HasPrefix(t, "**PR:**") || strings.HasPrefix(t, "**Journal:**") {
+			continue
+		}
+		out = append(out, t)
+	}
+	return strings.TrimSpace(strings.Join(out, " "))
+}
+
+// prPrefixed normalizes a bare "#161 …" PR field to "PR #161 …".
+func prPrefixed(s string) string {
+	if strings.HasPrefix(s, "#") {
+		return "PR " + s
+	}
+	return s
 }
 
 func parseDoneEntry(trimmed, raw string) (Card, string) {

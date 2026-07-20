@@ -19,4 +19,6 @@ should be able to understand later without asking.
 
 ## Index
 
-_(none yet)_
+- [0001](0001-widen-input-contract.md) — Widen the input contract beyond the
+  framework skeleton (heading-style DONE entries + emphasized ids); keep the
+  zero-dep line-scanner, defer goldmark (D4). **accepted**, 2026-07-20.
