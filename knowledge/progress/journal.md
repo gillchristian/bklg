@@ -140,3 +140,48 @@ right fix is a `/_diag` warning once the Warnings system exists (**TASK-004**).
 **Next:** TASK-003 — planning parser → `[]Card` + dedup + the three
 reconciliation warnings; build the rich `testdata/knowledge` §11 fixture. AC in
 `CURRENT.md`.
+
+---
+## 2026-07-20 14:42 — TASK-003 planning parser → model
+
+**Task:** TASK-003
+**What I did:** Added `internal/backlog/model.go` (§4 types) and `parse.go`: a
+line-oriented `Parser` (behind an interface per D4). `splitSections` splits on
+`## ` (so `### ` task headers survive; `## Entry template` + preamble ignored);
+`parseCurrent`/`parseBacklog`/`parseDone` extract the §2 fields; `reconcile`
+places one `Card` per id in its furthest column (Done>InProgress>Backlog) and
+emits the three §5 warnings. DONE lines split on `" — "` with date=field 3 and
+delivery=last field, so a summary with an embedded em-dash round-trips. Built
+the rich `testdata/knowledge` demo instance seeding every case.
+
+**What I verified:** Local CI green (`go build/vet ./...`, `gofmt -l` empty,
+`go test ./...` exit 0). Dumped the actual parsed board (throwaway test, since
+no HTTP surface yet) and quoted it:
+```
+CARDS (7): DEMO-4 Done done=true | DEMO-6 Done done=true |
+  DEMO-5 Done done=false (backlog [x], no DONE) | DEMO-1 InProgress ac=2 |
+  DEMO-2 InProgress ac=0 | DEMO-3 Backlog | (no id) Backlog parking=true
+WARNINGS (3): CURRENT holds >1 active task | DONE item not ticked in BACKLOG:
+  DEMO-6 | shipped item missing from DONE.md: DEMO-5
+```
+Tests: card table, dedup, exactly-3-warnings, field extraction (incl. em-dash
+summary), defensive (malformed line + missing area). Fresh-context review:
+**PASS** all 5 AC (it probed 2-em-dash summaries, NUL bytes, empty input — no
+panics). Two [low] findings fixed (parking-with-id dedup; shipped-in-CURRENT
+keeps detail) + dup-warning/symmetry notes; fixture board unchanged.
+
+**What changed:** New `internal/backlog/{model.go,parse.go,parse_test.go}` +
+`testdata/knowledge/*`. Delivery record: **PR #5, merged `42ff5c9`** (squash).
+
+**What I learned:** The DONE " — "-split is robust *because* date is pinned to
+field 3 and delivery to the last field — never trust field count alone when a
+free-text field sits in the middle. Also: `Resolve(path,dir)` joins `path/dir`,
+so a fixture instance at `testdata/knowledge` is reached with
+`Resolve("testdata","knowledge")`, not `Resolve("testdata/knowledge",…)` (cost
+me one red test). This is the 3rd close PR — the close mechanics (branch/commit/
+push/create/merge/sync) are now scriptable; will add `scripts/close-task.sh` for
+TASK-004+.
+
+**Next:** TASK-004 — parse `blockers.md` (§/blocker heading disambiguation),
+compute the `blocked` join + all badges, wire the board into the server, add
+`GET /_diag`. AC in `CURRENT.md`.
