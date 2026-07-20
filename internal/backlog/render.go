@@ -4,7 +4,9 @@ import (
 	"embed"
 	"html/template"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 //go:embed templates
@@ -15,6 +17,27 @@ var templatesFS embed.FS
 var funcs = template.FuncMap{
 	"badgeClass": badgeClass,
 	"badgeText":  badgeText,
+	"truncate":   truncate,
+}
+
+// truncate shortens a card title for the board so a long, paragraph-sized title
+// (real instances put whole records on a line) doesn't become a wall of text.
+// Rune-based (never splits a multibyte rune), with a small word-boundary backoff,
+// and appends an ellipsis. The full title stays on the detail page.
+func truncate(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if utf8.RuneCountInString(s) <= max {
+		return s
+	}
+	runes := []rune(s)
+	cut := max
+	for i := cut; i > max-24 && i > 0; i-- { // back up to a space for a clean break
+		if runes[i] == ' ' {
+			cut = i
+			break
+		}
+	}
+	return strings.TrimSpace(string(runes[:cut])) + "…"
 }
 
 // One template set per page (each defines its own "content"), sharing the
