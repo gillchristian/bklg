@@ -8,6 +8,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -15,6 +16,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/gillchristian/bklg/internal/backlog"
 )
 
 // splitArgs pre-splits argv so the optional positional [path] works in any
@@ -46,13 +49,6 @@ func splitArgs(argv []string) (path string, flagArgs, extra []string) {
 	return
 }
 
-// joinDisplay joins two path segments for display, preserving a leading "./"
-// the way the startup block in spec §9 shows it. filepath.Join would clean the
-// "./" away; this is a display string, not a path used for filesystem access.
-func joinDisplay(a, b string) string {
-	return strings.TrimSuffix(a, "/") + "/" + b
-}
-
 func main() {
 	path, flagArgs, extra := splitArgs(os.Args[1:])
 
@@ -75,11 +71,23 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Skeleton resolution: naive default paths, no Locations dereference and no
-	// existence checks. Real resolution is TASK-002.
-	knowledgeDir := joinDisplay(path, *dir)
-	planningDir := joinDisplay(knowledgeDir, "planning")
-	progressDir := joinDisplay(knowledgeDir, "progress")
+	areas, err := backlog.Resolve(path, *dir)
+	if err != nil {
+		// A root manifest (no planning area of its own, but a systems index) is
+		// a helpful case, not a blank failure: list the per-system invocations.
+		var rme *backlog.RootManifestError
+		if errors.As(err, &rme) {
+			fmt.Printf("bklg: no planning area at %s\n", rme.PlanningDir)
+			fmt.Printf("This looks like a multi-system root manifest (%s).\n", rme.ManifestPath)
+			fmt.Println("Point bklg at one system:")
+			for _, s := range rme.Systems {
+				fmt.Printf("  bklg %s --dir %s/knowledge\n", rme.Path, s)
+			}
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "bklg: %v\n", err)
+		os.Exit(1)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +106,8 @@ func main() {
 	}
 
 	fmt.Printf("Running Backlog on port %d\n", *port)
-	fmt.Printf("  knowledge: %s   planning: %s   progress: %s\n", knowledgeDir, planningDir, progressDir)
+	fmt.Printf("  knowledge: %s   planning: %s   progress: %s\n",
+		backlog.DisplayPath(areas.KnowledgeDir), backlog.DisplayPath(areas.PlanningDir), backlog.DisplayPath(areas.ProgressDir))
 	fmt.Printf("  http://localhost:%d\n", *port)
 
 	if err := http.Serve(ln, mux); err != nil {
