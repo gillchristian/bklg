@@ -16,7 +16,7 @@
         {{end}}
         <div class="text-sm leading-snug">
           {{if .ID}}<a class="font-mono text-xs text-blue-700 hover:underline" href="/{{.ID.Raw}}">{{.ID.Raw}}</a>
-          <span class="text-gray-400">·</span> {{end}}<span>{{.Title}}</span>
+          <span class="text-gray-400">·</span> {{end}}<span>{{truncate .Title 140}}</span>
         </div>
       </li>
       {{end}}
