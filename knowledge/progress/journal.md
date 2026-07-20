@@ -389,3 +389,29 @@ zero-dep constraint). This is the trigger the D4 goldmark seam anticipated.
 **Next:** Asked the user whether to ship the v2 batch autonomously now (same
 PR-per-task flow), do only the quick trail-fixes and pause before the
 design-heavy multi-system feature, or leave it queued. Await steer.
+
+---
+## 2026-07-20 16:30 — TASK-008 trim card text
+
+**Task:** TASK-008
+**What I did:** Added `truncate(s, max)` template helper (rune-based, word-
+boundary backoff, `…`) in `render.go`; `board.html` uses `{{truncate .Title 140}}`
+for the card title; `task.html` keeps the full title. Display-only.
+
+**What I verified:** Local CI green. `TestTruncate` (short unchanged, long→`…`
+≤141 runes, multibyte valid), `TestCardTitleBoardVsDetail` (board truncates,
+detail full). **Real-repo smoke** `bklg /Users/bb8/dev/trail --dir
+systems/track/knowledge` → 18 cards now end in `…` (~140-char titles, were full
+paragraphs). Fresh-context review: **PASS** all 4 AC, no findings (ruled out
+index-out-of-range even on invalid UTF-8; escaping intact — `+`→`&#43;`).
+
+**What changed:** `render.go` (+truncate), `board.html` (card title),
+`trim_test.go` (new). Delivery: **PR #16, merged `08c4053`**.
+
+**What I learned:** User chose "ship all five" v2 tasks autonomously. Trimming
+is the raw title now; TASK-010 markdown will make it emphasis-aware. The huge
+Done-card titles will also shrink once TASK-009 parses the `### `-heading DONE
+entries (dedup picks the short heading title over the fat `[x]` backlog stub).
+
+**Next:** TASK-009 — parse `### <ID>`-heading DONE entries + emphasized ids;
+record ADR-0001 (contract widening). AC in `CURRENT.md`.
