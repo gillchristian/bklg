@@ -107,6 +107,13 @@ func parseLocations(md string) map[string]string {
 		if i < 0 {
 			continue
 		}
+		// Keys are matched exactly (lowercase) — the framework skeleton always
+		// writes "planning:" / "progress:", and exact matching keeps a prose
+		// line that happens to contain a colon from being mistaken for a key.
+		// (The heading match above is intentionally case-insensitive; the block
+		// name is cosmetic, the keys are the contract.) A block that lists only
+		// one of the two keys overrides just that area; the other keeps its
+		// default in Resolve.
 		key := strings.TrimSpace(trimmed[:i])
 		if key == "planning" || key == "progress" {
 			out[key] = strings.TrimSpace(trimmed[i+1:])

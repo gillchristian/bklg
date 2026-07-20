@@ -92,6 +92,19 @@ func TestParseLocations(t *testing.T) {
 	}
 }
 
+func TestParseLocationsPartial(t *testing.T) {
+	// Only planning present: it is captured; progress is absent from the map so
+	// Resolve keeps progress at its base/progress default.
+	md := "## Locations\n\nplanning: only/plan\n\n## End\n"
+	loc := parseLocations(md)
+	if loc["planning"] != "only/plan" {
+		t.Errorf("planning = %q, want only/plan", loc["planning"])
+	}
+	if _, ok := loc["progress"]; ok {
+		t.Errorf("progress must be absent when the block omits it, got %q", loc["progress"])
+	}
+}
+
 func TestParseSystems(t *testing.T) {
 	md := strings.Join([]string{
 		"## Systems",
