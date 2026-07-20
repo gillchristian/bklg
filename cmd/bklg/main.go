@@ -20,8 +20,10 @@ import (
 // splitArgs pre-splits argv so the optional positional [path] works in any
 // position while stdlib flag — which stops parsing at the first non-flag token
 // — still sees every flag. Both "--port N" and "--port=N" forms are handled.
-// Zero dependencies, per spec §9.
-func splitArgs(argv []string) (path string, flagArgs []string) {
+// Flags always land in flagArgs regardless of position; the first bare token is
+// the path; any further bare tokens are returned in extra (the caller rejects
+// them — the contract is a single optional [path]). Zero dependencies, spec §9.
+func splitArgs(argv []string) (path string, flagArgs, extra []string) {
 	path = "."
 	takesValue := map[string]bool{"--port": true, "-port": true, "--dir": true, "-dir": true}
 	seenPath := false
@@ -38,7 +40,7 @@ func splitArgs(argv []string) (path string, flagArgs []string) {
 		if !seenPath {
 			path, seenPath = a, true
 		} else {
-			flagArgs = append(flagArgs, a) // extra positional -> let flag reject it
+			extra = append(extra, a) // more than one [path] is malformed input
 		}
 	}
 	return
@@ -52,7 +54,7 @@ func joinDisplay(a, b string) string {
 }
 
 func main() {
-	path, flagArgs := splitArgs(os.Args[1:])
+	path, flagArgs, extra := splitArgs(os.Args[1:])
 
 	fs := flag.NewFlagSet("bklg", flag.ContinueOnError)
 	fs.Usage = func() {
@@ -62,7 +64,15 @@ func main() {
 	port := fs.Int("port", 1235, "port to listen on")
 	dir := fs.String("dir", "knowledge", "knowledge dir, relative to [path]")
 	if err := fs.Parse(flagArgs); err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0) // -h/--help is a successful, requested action
+		}
 		os.Exit(2) // flag already printed the error + usage
+	}
+	if len(extra) > 0 {
+		fmt.Fprintf(os.Stderr, "bklg: unexpected argument(s): %s (only one [path] is allowed)\n", strings.Join(extra, " "))
+		fs.Usage()
+		os.Exit(2)
 	}
 
 	// Skeleton resolution: naive default paths, no Locations dereference and no
