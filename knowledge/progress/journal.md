@@ -263,3 +263,37 @@ right default: a template error becomes a 500 instead of a half-written page.
 **Next:** TASK-006 — task detail (`/{id}`, case-insensitive) + 404;
 state-appropriate fields, referencing blockers (open first), collapsed Raw
 block. Reinstate `Board.CardByRawID`. AC in `CURRENT.md`.
+
+---
+## 2026-07-20 15:24 — TASK-006 task detail + 404
+
+**Task:** TASK-006
+**What I did:** Added `GET /{id}` → `handleTask`: `CardByRawID` (case-insensitive
+via `EqualFold`), `http.NotFound` for unknown/id-less cards. Renders
+id/title/namespace/column/badges, state fields (In-Progress vs Done),
+referencing blockers (open-first via a `[]bool{true,false}` pass), and a
+collapsed `<details>` Raw block. New `task.html` + separate `taskTmpl`;
+reinstated `Board.CardByRawID`.
+
+**What I verified:** Local CI green. `detail_test.go` (In-Progress fields +
+checklist ☑/☐ + override + notes + raw; Done date/summary/delivery/journal;
+open vs resolved blockers on DEMO-2/DEMO-1; `/NOPE-999`→404, `/demo-1`→200).
+Binary: `/DEMO-1`→200, `/demo-1`→200, `/NOPE-999`→404, `/_diag`→200 (literal
+still wins). Fresh-context review: **PASS**, **zero findings** — injected
+`<script>`+quotes into all 16 rendered fields (all escaped to `&lt;`), path
+traversal (`/..`, `%2e%2e`, `/DEMO-1/extra`) → 301/404 no file-read/panic,
+blocker open-first ordering proven with a seeded resolved-before-open case. Its
+one note (stale `Routes()` comment mentioning unregistered `/_v`) was fixed.
+
+**What changed:** `internal/backlog/{server,model,render}.go`, new
+`templates/task.html`, new `detail_test.go`. Delivery: **PR #11, merged
+`cd00f36`** (+ comment-fix commit).
+
+**What I learned:** Go 1.22 mux precedence is genuinely "no ordering tricks" —
+`/_diag` (literal) beats `/{id}` (wildcard) regardless of registration order,
+and `/DEMO-1/extra` doesn't match `/{id}` (single segment) so it 404s cleanly.
+Escaping is entirely `html/template`'s doing — every field uses plain `{{}}`,
+zero `template.HTML`.
+
+**Next:** TASK-007 (final MVP task) — live reload: `/_v` max-mtime endpoint +
+~3s poll → `location.reload()`; compute `Meta.LatestMTime`. AC in `CURRENT.md`.
