@@ -14,16 +14,17 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-008 — Trim card text on the board; full text on the detail page
-**Source:** BACKLOG (v2 feedback; `../whiteboard/trail-instance-findings.md` #2)
+### TASK-009 — Parser robustness for real instances
+**Source:** BACKLOG (v2 feedback; `../whiteboard/trail-instance-findings.md` #1, #3, #5)
 **Acceptance criteria:**
-- [ ] AC1 — Long titles are trimmed on the board: a card whose title exceeds the limit renders a truncated title ending in `…` on `/`. (Decider: `truncate` unit test + a render test on a crafted long-title card asserts the board output contains the truncated prefix + `…` and **not** the full string.)
-- [ ] AC2 — Full text preserved on the detail page: `/<id>` shows the **full**, untrimmed title. (Decider: render the task template for the same long-title card; assert the full string is present.)
-- [ ] AC3 — Short titles unchanged: a title at/under the limit renders verbatim, no `…`. (Decider: `truncate` unit test + the existing fixture cards (short) still render their full titles — `TestBoardRender` stays green.)
-- [ ] AC4 — Rune-safe: truncation never splits a multibyte rune. (Decider: `truncate` unit test on a multibyte string.)
+- [ ] AC1 — Heading-style DONE entries parse: a `### <ID> — <title>` entry under `## Completed` (with a `**Completed:** <date> · **PR:** #N · **Journal:** …` line + prose body) yields a Done card with id, title, and a `DoneRecord` (Date, DeliveryRecord, JournalPointer, Summary) extracted from that body. (Decider: unit test on an inline heading-format `## Completed` string asserts each field.)
+- [ ] AC2 — Both DONE formats supported (no regression): the skeleton's `- <ID> — … — … — …. See journal …` bullet format still parses. (Decider: existing `TestParseCardTable`/`TestParseFields`/`TestParseDedup` stay green.)
+- [ ] AC3 — Emphasized ids recognized: `parseID` strips leading markdown decoration (`*`/`` ` ``/`_`/space), so `**WI-8 — …` → id `WI-8`. (Decider: unit test `parseID("**WI-8 — x")` → `{WI,8,"WI-8"}`; and a `- [ ] **WI-8 — …**` backlog line yields an id-bearing card.)
+- [ ] AC4 — Real-repo effect: against `trail --dir systems/track/knowledge`, the 15 "shipped item missing from DONE.md" warnings drop to ~0 (DONE ids now match the `[x]` backlog ids), and the Done cards use the **short** heading titles (dedup: DONE entry beats the huge `[x]` backlog stub). (Decider: binary smoke — `/_diag` warning count 15 → 0; a Done card title is the short heading form.)
+- [ ] AC5 — ADR recorded: an ADR in `../decisions/` documents (a) widening the §2 input contract to the heading DONE format + emphasized ids, and (b) the line-scanner-vs-goldmark call (spec D4). (Decider: `decisions/0001-*.md` exists + indexed.)
 
 **Notes:**
-- Add a `truncate(s string, max int) string` template helper in `render.go` (rune-count based, light word-boundary backoff, appends `…`); use it in `board.html` for the card title only. `task.html` keeps `{{.Card.Title}}` (full).
-- Limit ≈140 runes (≈2–3 lines). Trim operates on the raw title now; TASK-010 (markdown) will refine so a trim can't cut mid-`**` once titles render as markdown.
-- Don't touch the fixture card table (keep `TestParseCardTable` stable); test trimming via `truncate` unit cases + crafted view models so the board/detail split is asserted without rippling counts.
-- This is display-only — the model/`Card.Title` is unchanged; only the board's rendering trims.
+- `parseDone`: a `## Completed` section is heading-style if it contains any `### ` line → parse `### <ID>` blocks (ignore body `- ` bullets); else bullet-style (existing). New `parseDoneHeading(block)` + helpers `fieldAfter(body, marker)` (text after a `**Marker:**` up to the next ` · `/newline) and `doneSummary(body)` (prose minus the metadata line). `prPrefixed` normalizes `#161 …` → `PR #161 …`.
+- `parseID`: `strings.TrimLeft(TrimSpace(s), "*`_ ")` before matching `idRe`. Affects all id extraction uniformly; normal ids unaffected. (Trailing `**` on titles is left for TASK-010 markdown to clean.)
+- This **widens the input contract** deliberately (v2) — the tool's job is real instances, not just the skeleton. Record ADR-0001. If the heading/prose handling gets gnarly, that's the D4 signal to consider goldmark (note in the ADR; don't switch this task).
+- Test the parser with inline strings (no change to `testdata/knowledge` counts); verify the trail effect via binary smoke.
