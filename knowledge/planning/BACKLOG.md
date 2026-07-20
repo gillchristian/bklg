@@ -16,7 +16,7 @@ TASK-002, the rich parser/demo instance in TASK-003 — not as a separate task.
 
 ## Active
 
-- [ ] TASK-001 — CLI + server skeleton — `splitArgs` (positional-in-any-position, `--flag v`/`--flag=v`), `flag` parsing, `127.0.0.1` bind, `go:embed` layout, `GET /{$}` → 200, startup block. Creates `go.mod` (module `github.com/gillchristian/bklg`), `cmd/bklg/main.go`.
+- [x] TASK-001 — CLI + server skeleton — `splitArgs` (positional-in-any-position, `--flag v`/`--flag=v`), `flag` parsing, `127.0.0.1` bind, `GET /{$}` → 200, startup block. Creates `go.mod` (module `github.com/gillchristian/bklg`), `cmd/bklg/main.go`. — **PR #1, merged `288a814`**
 - [ ] TASK-002 — Area resolution — Locations-block dereference (repo-root-relative), default `base/planning`+`base/progress` fallback, root-manifest system-index list + helpful exit. Adds resolution fixtures under `testdata/`.
 - [ ] TASK-003 — Planning parser → model — line-oriented parser for `CURRENT.md`/`BACKLOG.md`/`DONE.md` → `[]Card` with the most-advanced-state dedup and the three reconciliation warnings. Ships the rich `testdata/knowledge/` demo/test instance (§11).
 - [ ] TASK-004 — Blocker parse + blocked join — parse `blockers.md` (§/blocker heading disambiguation), attach the `blocked` badge to open-blocker tasks; `/_diag` shows warnings.

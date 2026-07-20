@@ -14,17 +14,17 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-001 — CLI + server skeleton
-**Source:** BACKLOG (spec §15.1)
+### TASK-002 — Area resolution
+**Source:** BACKLOG (spec §15.2, detail in §3)
 **Acceptance criteria:**
-- [ ] AC1 — Builds clean: `go build ./...` exits 0 and `go build -o bklg ./cmd/bklg` produces the binary. (Decider: exit code 0.)
-- [ ] AC2 — Startup block: `bklg --port 9001 .` prints a block whose first line is exactly `Running Backlog on port 9001`, then the `knowledge:` / `planning:` / `progress:` resolution echo, then `http://localhost:9001`. (Decider: capture stdout; assert the first line string and the `http://localhost:9001` line are present.)
-- [ ] AC3 — Serves `/`: with the server up on 9001, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9001/` prints `200`. (Decider: HTTP status == 200.)
-- [ ] AC4 — Arg-order robustness: `bklg . --port 9001`, `bklg --port 9001 .`, and `bklg --port=9001 .` all bind 9001 and serve 200 — positional path parses in any position, and both space- and `=`-form flags parse. (Decider: run all three; each startup line shows `port 9001` and a follow-up curl returns 200.)
-- [ ] AC5 — Loopback only: the listener binds `127.0.0.1`, not `0.0.0.0` (spec §9). (Decider: code passes `127.0.0.1:<port>` to the server; `curl http://127.0.0.1:9001/` → 200 confirms loopback reachability.)
+- [ ] AC1 — Locations dereference: for a fixture repo whose `knowledge/README.md` has a `## Locations` block, resolution returns the `planning:`/`progress:` paths from that block, resolved **repo-root-relative** against `path` (spec §3 step 1). (Decider: a `resolve` unit test asserts `PlanningDir`/`ProgressDir` equal the expected fixture paths; the startup block echoes the same resolved paths.)
+- [ ] AC2 — Default fallback: for a fixture with a `knowledge/` dir but **no** `## Locations` block (or no manifest), resolution returns `base/planning` and `base/progress` where `base = path/dir` (spec §3 step 2). (Decider: unit test asserts the two resolved paths.)
+- [ ] AC3 — Root-manifest system list: pointed at a fixture **root manifest** (its resolved `planningDir` does not exist, but the manifest has a table with `systems/<name>` rows), `bklg` exits **non-zero** and prints each discovered system with the exact `bklg` invocation to board it (spec §3 step 3 / §9). (Decider: run it; assert exit≠0 and stdout lists the fixture's `systems/*` names + a `bklg … --dir systems/<name>/knowledge` line each.)
+- [ ] AC4 — No planning area and not a root manifest: exits non-zero with `no planning area at <planningDir>` (spec §3 step 3 tail). (Decider: run against a dir with neither a planning area nor a systems table; assert the message + non-zero exit.)
+- [ ] AC5 — `path` not a directory: `bklg <missing-or-file>` exits non-zero with a clear message before starting a server (spec §9 failure mode). (Decider: run against a nonexistent path and against a regular file; assert non-zero exit + message.)
 
 **Notes:**
-- Creates `go.mod` (`module github.com/gillchristian/bklg`, `go 1.22`) and `cmd/bklg/main.go`. **Scope refinement (2026-07-20):** the `go:embed` templates seam is deferred to TASK-005, where real templates arrive — planting a placeholder now would only be churned then, and TASK-001's AC don't need it. `/` returns a minimal static HTML placeholder for now.
-- Flag defaults per spec §9: `--port` 1235, `--dir` knowledge. First startup line is literally `Running Backlog on port N` (§9 wording — "Backlog", not "bklg").
-- Resolution here is the **skeleton** only: echo `path/dir`, `path/dir/planning`, `path/dir/progress` as plain defaults, with **no** Locations dereference and **no** existence checks — real resolution (Locations, fallback, root-manifest system list) is TASK-002.
-- `splitArgs` per spec §9 (pre-split argv, ~15 lines, zero deps) so `flag` doesn't choke on a positional after flags.
+- New file `internal/backlog/resolve.go`: `Resolve(path, dir string) (Areas, error)` returning `{KnowledgeDir, PlanningDir, ProgressDir}` (+ a typed "root manifest → systems" signal), unit-tested. `main.go` wires it in and the startup block echoes the **resolved** paths (replacing TASK-001's naive echo). On a resolution error, print the message to stderr and exit non-zero — no server.
+- Locations-block parse (spec §3): on `## Locations`, enter block; until the next line starting `## `, split each non-empty line on the **first** `:` into key/value, trim; keep `planning`/`progress`, ignore the rest.
+- System-index parse (spec §3): scan `|`-delimited rows for a cell matching `systems/\S+`; collect **distinct** dir names.
+- Resolution uses real filesystem paths (`filepath`); keep a display form for the echo. Fixtures needed: (a) a repo with a Locations manifest; (b) a repo with a default (no-Locations) `knowledge/`; (c) a root manifest with a `systems/*` table and no planning area; (d) a bare dir with neither. Put them under `testdata/` (the rich §11 parser instance is TASK-003).

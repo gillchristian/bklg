@@ -61,3 +61,41 @@ D3 is vacuous until GitHub Actions is added (parked).
 `go mod init github.com/gillchristian/bklg`, implement `cmd/bklg/main.go`
 (`splitArgs`, flags, 127.0.0.1 bind, `GET /{$}`→200, startup block), local CI,
 PR, fresh-context review, squash-merge, close PR.
+
+---
+## 2026-07-20 14:00 — TASK-001 CLI + server skeleton
+
+**Task:** TASK-001
+**What I did:** Built `cmd/bklg/main.go` (module `github.com/gillchristian/bklg`,
+`go 1.22`): `splitArgs` pre-splits argv (optional `[path]` in any position;
+`--flag v` and `--flag=v`), flags `--port` (1235) / `--dir` (knowledge),
+loopback-only listener created before the readiness echo, and a `GET /{$}`
+handler returning a 200 HTML placeholder. Startup block matches spec §9. After
+the fresh-context review I hardened arg handling (reject extra positionals at
+the boundary; `-h` exits 0) and added table-driven tests.
+
+**What I verified:** Local CI green —
+`go build ./... && go vet ./... && gofmt -l (empty) && go test ./...` → exit 0;
+`ok github.com/gillchristian/bklg/cmd/bklg`. All 5 AC by running the binary:
+startup block verbatim `Running Backlog on port 9041` + resolution echo +
+`http://localhost:9041`; all three arg forms → `curl / = 200`; `lsof` showed the
+listener bound to `127.0.0.1:*` (reviewer's check); port-in-use → exit 1 with
+`bklg: cannot listen on 127.0.0.1:9041: … address already in use` and no
+"Running" line; extra positional → `bklg: unexpected argument(s): b …` exit 2.
+Fresh-context review (subagent, diff+AC only): **PASS**, no blocking findings.
+
+**What changed:** `cmd/bklg/main.go`, `cmd/bklg/main_test.go`, `go.mod` (new);
+`knowledge/planning/CURRENT.md` (scope-refinement note re: deferring the embed
+seam to TASK-005). Delivery record: **PR #1, merged `288a814`** (squash).
+
+**What I learned:** (1) The Bash tool here runs **`/bin/zsh`**, which does *not*
+word-split unquoted `$var` — a loop of `bklg $form` passed each whole string as
+one arg and misfired. Pass separate args / use `"$@"`. (2) macOS first-exec of a
+freshly built binary can outrun a 0.4s startup sleep (Gatekeeper-ish check);
+give warm-up or ~0.6s. (3) stdlib `flag` *ignores* (doesn't reject) extra
+positionals, and since it stops at the first non-flag token, a stray positional
+before a flag silently drops that flag — hence the boundary rejection.
+
+**Next:** TASK-002 — area resolution (`internal/backlog/resolve.go`): Locations
+dereference, default fallback, root-manifest system list; wire into `main`, echo
+resolved paths; add `testdata/` resolution fixtures. AC in `CURRENT.md`.

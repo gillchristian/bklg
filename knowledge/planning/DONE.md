@@ -11,4 +11,4 @@ profile), and a journal pointer.
 
 ## Completed
 
-_(none yet)_
+- TASK-001 — CLI + server skeleton — 2026-07-20 — `splitArgs`-based CLI (positional in any position; `--flag v` and `--flag=v`), flags `--port`/`--dir`, loopback-only bind with clean port-in-use failure, and a `GET /{$}` handler returning a 200 HTML placeholder; startup block matches spec §9 verbatim. Fresh-context review passed all 5 AC; its two non-blocking notes (silent extra-positional drop, `-h` exit code) were fixed and covered by table-driven `splitArgs`/`joinDisplay` tests. — PR #1, merged `288a814`. See journal 2026-07-20 14:00.
