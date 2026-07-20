@@ -415,3 +415,35 @@ entries (dedup picks the short heading title over the fat `[x]` backlog stub).
 
 **Next:** TASK-009 — parse `### <ID>`-heading DONE entries + emphasized ids;
 record ADR-0001 (contract widening). AC in `CURRENT.md`.
+
+---
+## 2026-07-20 16:47 — TASK-009 parser robustness (real instances)
+
+**Task:** TASK-009
+**What I did:** Extended `parseDone` to also parse `### <ID> — <title>`
+heading-style entries (`parseDoneHeading` + `fieldAfter`/`doneSummary`/
+`prPrefixed`), kept the bullet format; `parseID` now strips leading `* ` `` ` ``
+`_`. ADR-0001 records the contract widening (keep line-scanner, defer goldmark/D4).
+
+**What I verified:** Local CI green. Tests: `TestParseDoneHeadingFormat`,
+`TestParseIDEmphasis`, `TestParseDoneFormatExclusivity`, and (after review)
+`TestParseIDTitleDecorated`. Real trail: `/TRACK-000` now shows Date 2026-06-25 /
+PR #161 / Journal / Summary; `/_diag` no longer lists TRACK-000. Fresh-context
+review: **PASS** all 5 AC; caught a **latent [low] bug** — `parseIDTitle`'s
+no-separator branch sliced `s[len(id.Raw):]` from index 0, wrong once `parseID`
+strips decoration (`**WI-8**` → `"8**"`). Fixed (locate id in stripped string +
+trim) + added the missing test.
+
+**What I learned (correction):** My AC4 hypothesis "15 → 0 warnings" was WRONG.
+trail's DONE.md holds **only** TRACK-000; TRACK-001…014 live solely in the rich
+`[x]` BACKLOG lines. So 14/15 warnings are the check *correctly* flagging a
+convention divergence — a **policy** question for TASK-011, not a parse bug. I
+revised AC4 honestly (didn't fake it) and corrected the whiteboard. Lesson:
+verify the *data* before assuming a warning is a parse failure.
+
+**What changed:** `parse.go` (+heading DONE, +decoration-strip, parseIDTitle
+fix), `donefmt_test.go`, `decisions/0001-*.md` + INDEX, whiteboard correction.
+Delivery: **PR #18, merged `d0e33a5`**.
+
+**Next:** TASK-010 — safe inline markdown (escape-first, stdlib-only, ADR-0002);
+the one place `template.HTML` is used → paranoid security review. AC in `CURRENT.md`.
