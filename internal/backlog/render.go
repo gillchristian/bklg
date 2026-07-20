@@ -3,6 +3,7 @@ package backlog
 import (
 	"embed"
 	"html/template"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -151,10 +152,15 @@ func buildDiagVM(b Board) diagVM {
 			seen[k] = true
 		}
 	}
-	for k, ws := range byKind { // any unknown kinds, future-proof
+	var unknown []string // any future kinds not in diagKindOrder
+	for k := range byKind {
 		if !seen[k] {
-			groups = append(groups, diagGroup{Kind: k, Title: k, Warnings: ws})
+			unknown = append(unknown, k)
 		}
+	}
+	sort.Strings(unknown) // deterministic order (map iteration is randomized)
+	for _, k := range unknown {
+		groups = append(groups, diagGroup{Kind: k, Title: k, Warnings: byKind[k]})
 	}
 	return diagVM{
 		PlanningDir: DisplayPath(b.Meta.PlanningDir),
