@@ -121,6 +121,26 @@ func TestMultiBoardRoutes(t *testing.T) {
 	}
 }
 
+// Single-system mode ignores ?system= (a no-op) — cards all have System=="",
+// so a filter must not blank the board (regression guard for the review finding).
+func TestSingleModeIgnoresSystemFilter(t *testing.T) {
+	srv := fixtureServer(t) // single-system DEMO fixture
+	h := srv.Routes()
+	body := func(p string) string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", p, nil))
+		return rec.Body.String()
+	}
+	plain := strings.Count(body("/"), `href="/DEMO-`)
+	filtered := strings.Count(body("/?system=anything"), `href="/DEMO-`)
+	if plain == 0 {
+		t.Fatal("single-mode board shows no cards")
+	}
+	if filtered != plain {
+		t.Errorf("single mode should ignore ?system=: /=%d cards, /?system=anything=%d", plain, filtered)
+	}
+}
+
 // AC5: a system in the index that fails to resolve is skipped with a warning,
 // not a crash; the other systems still render.
 func TestMultiServerSkipsUnresolvable(t *testing.T) {

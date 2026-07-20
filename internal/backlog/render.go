@@ -107,6 +107,9 @@ type taskVM struct {
 // filter bar lists every one, including those with zero cards, so any project is
 // filterable and the bar matches the startup's system count.
 func viewModel(b Board, systemFilter string, allSystems []string) boardVM {
+	if len(allSystems) == 0 {
+		systemFilter = "" // single-system mode: ?system= is a genuine no-op
+	}
 	counts := map[string]int{}
 	for _, c := range b.Cards {
 		if c.System != "" {
