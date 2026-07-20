@@ -99,3 +99,44 @@ before a flag silently drops that flag — hence the boundary rejection.
 **Next:** TASK-002 — area resolution (`internal/backlog/resolve.go`): Locations
 dereference, default fallback, root-manifest system list; wire into `main`, echo
 resolved paths; add `testdata/` resolution fixtures. AC in `CURRENT.md`.
+
+---
+## 2026-07-20 14:19 — TASK-002 area resolution
+
+**Task:** TASK-002
+**What I did:** Added `internal/backlog/resolve.go` (`Resolve(path,dir)` →
+`Areas{KnowledgeDir,PlanningDir,ProgressDir}`): parse `base/README.md`'s
+`## Locations` block (keys `planning`/`progress`, values joined **against
+`path`** = repo-root-relative), fall back to `base/planning`+`base/progress`,
+and on a missing planning dir detect a `systems/<name>` root manifest
+(`RootManifestError`) vs a plain "no planning area". `main` now resolves before
+binding, exits non-zero with a clear message (no server) on failure, prints the
+per-system invocation list for a root manifest, and echoes resolved paths via
+`DisplayPath` (restores the `./`). Removed the skeleton's `joinDisplay`.
+
+**What I verified:** Local CI green — `go build/vet ./...`, `gofmt -l` empty,
+`go test ./...` → exit 0; `ok …/internal/backlog`, `ok …/cmd/bklg`. 9 backlog
+unit tests PASS (Locations dereference w/ **non-default** `alt/planning` so it
+can't pass coincidentally; default fallback; root-manifest dedup+order; no
+planning area ≠ root manifest; path-not-dir; parseLocations incl. partial block;
+parseSystems; DisplayPath). Binary smokes: root manifest → exit 1 listing
+`bklg … --dir systems/alpha/knowledge` + `…beta…`; `empty` → exit 1
+`no planning area at …/empty/knowledge/planning`; file & missing path → exit 1
+`path is not a directory`. **Dogfood** `bklg .` → `planning: ./knowledge/planning`
+via the real manifest, HTTP 200. Fresh-context review: **PASS**, no findings.
+
+**What changed:** New `internal/backlog/{resolve.go,resolve_test.go}` +
+`testdata/resolve/*` fixtures; `cmd/bklg/main.go` (+`errors`, backlog import,
+resolution wiring, −`joinDisplay`); `cmd/bklg/main_test.go` (−`TestJoinDisplay`).
+Delivery record: **PR #3, merged `4cf04c1`** (squash).
+
+**What I learned:** Go tooling ignores `testdata/` dirs, so package-local
+`internal/backlog/testdata/` is the clean home for fixtures (tests run with CWD =
+package dir → simple relative paths); minor, justified deviation from spec §10's
+repo-root `testdata/`. Review flagged that a present-but-**unreadable** manifest
+silently falls back to default (only `err==nil` checked) — accepted for now; the
+right fix is a `/_diag` warning once the Warnings system exists (**TASK-004**).
+
+**Next:** TASK-003 — planning parser → `[]Card` + dedup + the three
+reconciliation warnings; build the rich `testdata/knowledge` §11 fixture. AC in
+`CURRENT.md`.
