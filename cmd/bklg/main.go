@@ -71,25 +71,29 @@ func main() {
 		os.Exit(2)
 	}
 
+	var srv *backlog.Server
+	var echo func() // prints the mode-appropriate resolution line
 	areas, err := backlog.Resolve(path, *dir)
 	if err != nil {
-		// A root manifest (no planning area of its own, but a systems index) is
-		// a helpful case, not a blank failure: list the per-system invocations.
+		// A root manifest (no planning area of its own, but a systems index) now
+		// aggregates every system into one board instead of erroring (TASK-012).
 		var rme *backlog.RootManifestError
 		if errors.As(err, &rme) {
-			fmt.Printf("bklg: no planning area at %s\n", rme.PlanningDir)
-			fmt.Printf("This looks like a multi-system root manifest (%s).\n", rme.ManifestPath)
-			fmt.Println("Point bklg at one system:")
-			for _, s := range rme.Systems {
-				fmt.Printf("  bklg %s --dir %s/knowledge\n", rme.Path, s)
+			srv = backlog.NewMultiServer(rme.Path, rme.Systems)
+			echo = func() {
+				fmt.Printf("  aggregate: %d systems — %s\n", len(srv.Systems()), strings.Join(srv.Systems(), ", "))
 			}
+		} else {
+			fmt.Fprintf(os.Stderr, "bklg: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "bklg: %v\n", err)
-		os.Exit(1)
+	} else {
+		srv = backlog.NewServer(areas)
+		echo = func() {
+			fmt.Printf("  knowledge: %s   planning: %s   progress: %s\n",
+				backlog.DisplayPath(areas.KnowledgeDir), backlog.DisplayPath(areas.PlanningDir), backlog.DisplayPath(areas.ProgressDir))
+		}
 	}
-
-	srv := backlog.NewServer(areas)
 
 	// Bind loopback only (spec §9) — this is a personal dev tool. Create the
 	// listener before announcing readiness so "port in use" fails cleanly
@@ -102,8 +106,7 @@ func main() {
 	}
 
 	fmt.Printf("Running Backlog on port %d\n", *port)
-	fmt.Printf("  knowledge: %s   planning: %s   progress: %s\n",
-		backlog.DisplayPath(areas.KnowledgeDir), backlog.DisplayPath(areas.PlanningDir), backlog.DisplayPath(areas.ProgressDir))
+	echo()
 	fmt.Printf("  http://localhost:%d\n", *port)
 
 	if err := http.Serve(ln, srv.Routes()); err != nil {

@@ -26,3 +26,7 @@ should be able to understand later without asking.
   (escape-first + tag whitelist + href scheme-check), stdlib-only; keep the
   zero-dep constraint rather than pull in goldmark + a sanitizer. **accepted**,
   2026-07-20.
+- [0003](0003-multi-system-board.md) — Multi-system board: a root manifest
+  aggregates all `systems/<name>` into one board with per-card system chips and
+  a server-side `?system=` filter (lists every system); global detail lookup;
+  unresolvable systems skipped with a warning. **accepted**, 2026-07-20.

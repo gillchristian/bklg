@@ -72,6 +72,7 @@ type Card struct {
 	Acceptance       []Criterion // from CURRENT
 	Done             *DoneRecord // from DONE
 	ParkingLot       bool
+	System           string // owning system in aggregate/multi-system mode; "" single-system
 	Raw              string // the source block, shown verbatim on the detail page
 }
 
