@@ -3,6 +3,7 @@ package backlog
 import (
 	"embed"
 	"html/template"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -73,6 +74,15 @@ type boardVM struct {
 	Warnings    []Warning
 	Version     string
 	Columns     []columnVM
+	Systems     []systemChip // multi-system filter bar; empty in single-system mode
+}
+
+// systemChip is one entry in the multi-system filter bar.
+type systemChip struct {
+	Name   string
+	Count  int
+	Active bool
+	Href   string
 }
 
 type columnVM struct {
@@ -91,9 +101,24 @@ type taskVM struct {
 	Blockers    []Blocker
 }
 
-func viewModel(b Board) boardVM {
+// viewModel builds the board view. systemFilter (from ?system=) restricts the
+// cards to one system in aggregate mode; it is a no-op in single-system mode.
+// allSystems is the full set of discovered systems (empty in single mode) — the
+// filter bar lists every one, including those with zero cards, so any project is
+// filterable and the bar matches the startup's system count.
+func viewModel(b Board, systemFilter string, allSystems []string) boardVM {
+	counts := map[string]int{}
+	for _, c := range b.Cards {
+		if c.System != "" {
+			counts[c.System]++
+		}
+	}
+
 	cols := []columnVM{{Title: "Backlog"}, {Title: "In Progress"}, {Title: "Done"}}
 	for _, c := range b.Cards {
+		if systemFilter != "" && c.System != systemFilter {
+			continue
+		}
 		switch c.Column {
 		case ColBacklog:
 			cols[0].Cards = append(cols[0].Cards, c)
@@ -103,11 +128,21 @@ func viewModel(b Board) boardVM {
 			cols[2].Cards = append(cols[2].Cards, c)
 		}
 	}
+
+	var chips []systemChip
+	if len(allSystems) > 0 { // aggregate mode
+		chips = append(chips, systemChip{Name: "All", Count: len(b.Cards), Active: systemFilter == "", Href: "/"})
+		for _, name := range allSystems {
+			chips = append(chips, systemChip{Name: name, Count: counts[name], Active: systemFilter == name, Href: "/?system=" + url.QueryEscape(name)})
+		}
+	}
+
 	return boardVM{
 		PlanningDir: DisplayPath(b.Meta.PlanningDir),
 		Warnings:    b.Warnings,
 		Version:     versionString(b.Meta.LatestMTime),
 		Columns:     cols,
+		Systems:     chips,
 	}
 }
 

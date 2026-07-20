@@ -1,4 +1,12 @@
 {{define "content"}}
+{{if .Systems}}
+<div class="flex flex-wrap items-center gap-1.5 mb-4">
+  <span class="text-xs text-gray-500 mr-1">system:</span>
+  {{range .Systems}}
+  <a href="{{.Href}}" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border {{if .Active}}bg-blue-600 text-white border-blue-600{{else}}bg-white text-gray-700 border-gray-300 hover:border-gray-400{{end}}">{{.Name}} <span class="ml-1 {{if .Active}}text-blue-100{{else}}text-gray-400{{end}}">{{.Count}}</span></a>
+  {{end}}
+</div>
+{{end}}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
   {{range .Columns}}
   <section class="bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -9,8 +17,9 @@
     <ul class="p-2 space-y-2">
       {{range .Cards}}
       <li class="rounded-md border border-gray-200 p-2.5 hover:border-gray-300{{if .ParkingLot}} bg-slate-50 opacity-75{{end}}">
-        {{if .Badges}}
+        {{if or .System .Badges}}
         <div class="flex flex-wrap items-center gap-1 mb-1.5">
+          {{if .System}}<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-600/20">{{.System}}</span>{{end}}
           {{range .Badges}}<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset {{badgeClass .Kind}}">{{badgeText .}}</span>{{end}}
         </div>
         {{end}}

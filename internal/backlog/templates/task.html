@@ -1,8 +1,9 @@
 {{define "content"}}
 <a href="/" class="text-sm text-blue-700 hover:underline">← board</a>
 <article class="mt-3 bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5">
-  {{if .Card.Badges}}
+  {{if or .Card.System .Card.Badges}}
   <div class="flex flex-wrap items-center gap-1 mb-2">
+    {{if .Card.System}}<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-600/20">{{.Card.System}}</span>{{end}}
     {{range .Card.Badges}}<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset {{badgeClass .Kind}}">{{badgeText .}}</span>{{end}}
   </div>
   {{end}}
