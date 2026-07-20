@@ -89,11 +89,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprint(w, skeletonPage)
-	})
+	srv := backlog.NewServer(areas)
 
 	// Bind loopback only (spec §9) — this is a personal dev tool. Create the
 	// listener before announcing readiness so "port in use" fails cleanly
@@ -110,18 +106,8 @@ func main() {
 		backlog.DisplayPath(areas.KnowledgeDir), backlog.DisplayPath(areas.PlanningDir), backlog.DisplayPath(areas.ProgressDir))
 	fmt.Printf("  http://localhost:%d\n", *port)
 
-	if err := http.Serve(ln, mux); err != nil {
+	if err := http.Serve(ln, srv.Routes()); err != nil {
 		fmt.Fprintf(os.Stderr, "bklg: server error: %v\n", err)
 		os.Exit(1)
 	}
 }
-
-const skeletonPage = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>bklg</title></head>
-<body>
-<h1>bklg</h1>
-<p>Backlog board coming online — CLI + server skeleton (TASK-001).</p>
-</body>
-</html>
-`
