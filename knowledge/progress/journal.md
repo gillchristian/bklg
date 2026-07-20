@@ -185,3 +185,46 @@ TASK-004+.
 **Next:** TASK-004 — parse `blockers.md` (§/blocker heading disambiguation),
 compute the `blocked` join + all badges, wire the board into the server, add
 `GET /_diag`. AC in `CURRENT.md`.
+
+---
+## 2026-07-20 14:57 — TASK-004 blockers + badges + /_diag
+
+**Task:** TASK-004
+**What I did:** `parseBlockers` reads `blockers.md`; a `## ` line matching
+`^BLOCKER-\d+` is a blocker (assigned to the last section seen), else it's a
+section — everything under `## Format` is skipped; `Open` = under `## Open`.
+`computeBadges` joins planning+progress in one place: `blocked` (open blocker's
+affected id), `parking`, `override`, `no-ac`, `namespace`. New `server.go`:
+`Server` re-parses per request, serves a `/` placeholder + `GET /_diag`
+(warnings verbatim, text/plain). `main` now serves `srv.Routes()`.
+
+**What I verified:** Local CI green. Tests: `TestParseBlockers` (BLOCKER-001
+Open/DEMO-2, BLOCKER-002 Resolved/DEMO-1, Format example skipped), `TestBadges`
+(DEMO-2 blocked+no-ac+namespace; DEMO-1 override, not blocked; parking chip),
+`TestDiagRoute` (exactly 3 warning lines, text/plain), `TestBoardRoute` (200).
+Binary: `/_diag` on the fixture →
+```
+CURRENT holds >1 active task (framework one-task invariant)
+DONE item not ticked in BACKLOG: DEMO-6
+shipped item missing from DONE.md: DEMO-5
+```
+**Dogfood** `bklg . /_diag` → `no warnings` (this repo's real instance is clean).
+Fresh-context review: **PASS** all 5 AC (probed case-insensitive join, live
+reparse, nil-ID safety). Its [low] finding — em-dash in a blocker title — and a
+trailing-text join note were fixed (anchor on `opened <ts>`; normalize the join
+id) and pinned with tests; fixture unchanged.
+
+**What changed:** `internal/backlog/parse.go` (+parseBlockers/parseBlockerHead/
+computeBadges, extended Parse), new `internal/backlog/server.go`,
+`internal/backlog/{blockers_test,server_test}.go`, `cmd/bklg/main.go` (serves
+via Server; dropped the inline mux/skeleton). Delivery: **PR #7, merged
+`835363f`**.
+
+**What I learned:** Two functions now anchor a middle free-text field by pinning
+the fixed fields at the ends (DONE: date=3rd, delivery=last; blocker: title
+between id and `opened`) — the robust pattern for em-dash-delimited lines.
+Also: first use of `scratchpad/close-task.sh` for this close PR's mechanics.
+
+**Next:** TASK-005 — board template (`/`): three columns, card per task, badge
+markup, diagnostics banner; `html/template` + `go:embed` + Tailwind Play CDN.
+AC in `CURRENT.md`.

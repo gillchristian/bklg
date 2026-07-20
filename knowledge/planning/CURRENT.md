@@ -14,18 +14,18 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-004 — Blocker parse + blocked join
-**Source:** BACKLOG (spec §15.4; blocker contract §2, badges §6, `/_diag` route §7)
+### TASK-005 — Board template + badges + Tailwind
+**Source:** BACKLOG (spec §15.5; rendering §7, styling §8, badges §6)
 **Acceptance criteria:**
-- [ ] AC1 — Blocker parse: `blockers.md` → `[]Blocker`. Disambiguate blocker headings (`^BLOCKER-\d+`) from section headings (`Format`/`Open`/`Resolved`); track the current section; **skip everything under `## Format`**; each blocker captures id, title, `opened` ts, `**Task affected:**` (the join key), body, and `Open` = (section is `Open`). (Decider: unit test on the fixture asserts BLOCKER-001 is Open affecting DEMO-2, BLOCKER-002 is Resolved affecting DEMO-1, and the `## Format` example is ignored.)
-- [ ] AC2 — `blocked` badge join (the load-bearing badge, §6): a card whose id is the `Task affected` of an **open** blocker carries a `blocked` badge; a card affected only by a **resolved** blocker does not. (Decider: test asserts DEMO-2 has `blocked`, DEMO-1 does not.)
-- [ ] AC3 — Other badges (§6): `parking` (parking-lot card), `override` (card with a `DeliveryOverride`), `no-ac` (In-Progress card with zero acceptance criteria), and the `namespace` chip (the id's namespace). (Decider: test asserts DEMO-2 → {blocked, no-ac, namespace:DEMO}; DEMO-1 → {override, namespace:DEMO}; the parking card → {parking}.)
-- [ ] AC4 — `/_diag` route (§7): `GET /_diag` returns the board's warnings verbatim, one per line, wired into `main` with the board built **per request**; the board build now also parses blockers from the progress area. (Decider: `curl /_diag` against the fixture instance lists the warnings.)
-- [ ] AC5 — Zero **unexpected** warnings (spec §15.4): against the fixture, `/_diag` shows only the three seeded reconciliation warnings — no blocker-parse or read warnings. (Decider: `curl -s /_diag` equals exactly the three known lines.)
+- [ ] AC1 — Three columns: `GET /` renders the three column headings **Backlog**, **In Progress**, **Done**. (Decider: `curl -s /` contains all three heading strings.)
+- [ ] AC2 — A card per task: one card block per parsed card, each showing id + title + its badges; a card with an id links to `/<id>`. (Decider: `curl -s /` on the fixture contains each card's id and title; the number of card blocks equals the parsed card count (7).)
+- [ ] AC3 — Badges render (§6): the blocked card shows a `blocked` badge; `parking`/`override`/`no-ac`/`namespace` chips render on the right cards. (Decider: `curl -s /` shows `blocked` on DEMO-2's card and the namespace chip `DEMO`.)
+- [ ] AC4 — Diagnostics banner + header (§7): a header line shows the resolved planning path; when `len(Warnings)>0` a subtle banner links to `/_diag`. (Decider: `curl -s /` on the fixture contains the planning path and a link to `/_diag`; a clean instance shows no banner.)
+- [ ] AC5 — `html/template` + `go:embed` + Tailwind Play CDN, no injection (§2/§7/§8): templates are embedded; captured repo text is auto-escaped (a `<` in a title renders escaped, not as a tag); empty columns show a muted placeholder; the Tailwind Play CDN `<script>` is present. (Decider: `curl -s /` contains the `cdn.tailwindcss.com` script tag; feed a fixture card a title with `<b>` and confirm it appears escaped in the HTML.)
 
 **Notes:**
-- Extend `lineParser.Parse` to also read `blockers.md` from `Areas.ProgressDir` (making `Parse` produce the **complete** board) and to compute `Card.Badges` in one place — `blocked` needs the join, the rest are planning-only. New `parseBlockers` in `parse.go` (or `blockers.go`).
-- Section/heading disambiguation per §2: a `##` line matching `^BLOCKER-\d+` is a blocker; `Format`/`Open`/`Resolved` are sections; assign each blocker to the last section seen; skip `Format`.
-- Wire the board into `server` (build per request — spec §7 freshness). Add `GET /_diag`. `/` stays the placeholder until TASK-005; `Board.Meta` dirs feed the `/_diag` header line if useful.
-- Escaping: `/_diag` is plain text (warnings verbatim); no HTML rendering of repo content (spec §2).
-- Consider the review's earlier note: a present-but-unreadable manifest/file could warrant a `/_diag` warning — optional here, don't over-build.
+- Templates live at `internal/backlog/templates/*.html` (embedded via `go:embed` from the `backlog` package — `go:embed` can't traverse `..`, so co-locate rather than a repo-root `templates/`; minor, justified deviation from spec §10). A `layout` partial + `board` template (a `task` template comes in TASK-006).
+- Build a small view model (columns → cards) from the `Board`; render with `html/template` (auto-escaping is the injection defense — spec §2, "do not render text as HTML"). Badge → CSS class map for colour (blocked red, parking slate, override amber, no-ac yellow, namespace gray — spec §6 suggested styles).
+- Replace `server.go`'s `handleBoard` placeholder with real rendering; keep per-request parse. Header shows `DisplayPath(planning)`; banner only when warnings exist, linking `/_diag`.
+- Cards with an id are `<a href="/{id}">`; parking/no-id cards are muted and not linked (no detail page — TASK-006). Empty column → muted placeholder.
+- Add a smoke asserting the escaping (a `<` in repo text must not become a live tag).
