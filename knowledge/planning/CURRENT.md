@@ -14,18 +14,17 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-005 — Board template + badges + Tailwind
-**Source:** BACKLOG (spec §15.5; rendering §7, styling §8, badges §6)
+### TASK-006 — Task detail + 404
+**Source:** BACKLOG (spec §15.6; detail rendering §7, route key D2)
 **Acceptance criteria:**
-- [ ] AC1 — Three columns: `GET /` renders the three column headings **Backlog**, **In Progress**, **Done**. (Decider: `curl -s /` contains all three heading strings.)
-- [ ] AC2 — A card per task: one card block per parsed card, each showing id + title + its badges; a card with an id links to `/<id>`. (Decider: `curl -s /` on the fixture contains each card's id and title; the number of card blocks equals the parsed card count (7).)
-- [ ] AC3 — Badges render (§6): the blocked card shows a `blocked` badge; `parking`/`override`/`no-ac`/`namespace` chips render on the right cards. (Decider: `curl -s /` shows `blocked` on DEMO-2's card and the namespace chip `DEMO`.)
-- [ ] AC4 — Diagnostics banner + header (§7): a header line shows the resolved planning path; when `len(Warnings)>0` a subtle banner links to `/_diag`. (Decider: `curl -s /` on the fixture contains the planning path and a link to `/_diag`; a clean instance shows no banner.)
-- [ ] AC5 — `html/template` + `go:embed` + Tailwind Play CDN, no injection (§2/§7/§8): templates are embedded; captured repo text is auto-escaped (a `<` in a title renders escaped, not as a tag); empty columns show a muted placeholder; the Tailwind Play CDN `<script>` is present. (Decider: `curl -s /` contains the `cdn.tailwindcss.com` script tag; feed a fixture card a title with `<b>` and confirm it appears escaped in the HTML.)
+- [ ] AC1 — Detail for a known id: `GET /<id>` (id matched **case-insensitively**, D2) renders id, title, namespace, current column, and badges. (Decider: `curl -s /DEMO-1` shows `DEMO-1`, its title, `In Progress`, and its badges.)
+- [ ] AC2 — State-appropriate fields (§7): an In-Progress card shows Source, Acceptance criteria as a checklist (checked/unchecked), Notes, Delivery override; a Done card shows date, summary, delivery record, journal pointer (plain text — the journal isn't served in v1). (Decider: `curl -s /DEMO-1` shows its 2 criteria + the override; `curl -s /DEMO-4` shows its date/summary/delivery/journal-pointer.)
+- [ ] AC3 — Referencing blockers (§7): the page lists blockers whose `Task affected` is this id, **open first then resolved**. (Decider: `curl -s /DEMO-2` shows the open BLOCKER-001; `curl -s /DEMO-1` shows the resolved BLOCKER-002.)
+- [ ] AC4 — Collapsed source block (§7): the page always shows a collapsed block containing the card's `Raw` source (escaped). (Decider: `curl -s /DEMO-1` contains a `<details>` with the raw `### DEMO-1 …` block.)
+- [ ] AC5 — Unknown id → 404; parking/id-less cards have no detail page (§5); case-insensitive lookup works. (Decider: `curl -o /dev/null -w '%{http_code}' /NOPE-999` → `404`; `/demo-1` → `200`.)
 
 **Notes:**
-- Templates live at `internal/backlog/templates/*.html` (embedded via `go:embed` from the `backlog` package — `go:embed` can't traverse `..`, so co-locate rather than a repo-root `templates/`; minor, justified deviation from spec §10). A `layout` partial + `board` template (a `task` template comes in TASK-006).
-- Build a small view model (columns → cards) from the `Board`; render with `html/template` (auto-escaping is the injection defense — spec §2, "do not render text as HTML"). Badge → CSS class map for colour (blocked red, parking slate, override amber, no-ac yellow, namespace gray — spec §6 suggested styles).
-- Replace `server.go`'s `handleBoard` placeholder with real rendering; keep per-request parse. Header shows `DisplayPath(planning)`; banner only when warnings exist, linking `/_diag`.
-- Cards with an id are `<a href="/{id}">`; parking/no-id cards are muted and not linked (no detail page — TASK-006). Empty column → muted placeholder.
-- Add a smoke asserting the escaping (a `<` in repo text must not become a live tag).
+- Add `task.html` (defines its own `content`) + a `taskTmpl` = layout + task (separate set from `boardTmpl` so both can define `content`). Reinstate `Board.CardByRawID(raw)` (case-insensitive; skips id-less cards) — removed in TASK-003 as premature, now needed.
+- `handleTask`: `id := r.PathValue("id")`; look up via `CardByRawID`; 404 (`http.NotFound`) if missing. Collect referencing blockers by matching `parseID(ToUpper(TaskRaw))` to the card id, order open-first. Buffered render like `handleBoard`. Route `GET /{id}` (literal `/_v`,`/_diag`,`/{$}` beat it — spec §7).
+- Detail view model carries `PlanningDir`+`Warnings` (so the shared layout header/banner render) plus the `Card` and its referencing `Blockers`.
+- Everything escaped via `html/template` (Raw block included). Acceptance rendered as a checklist (☑/☐ or checked styling).

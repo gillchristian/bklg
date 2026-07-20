@@ -228,3 +228,38 @@ Also: first use of `scratchpad/close-task.sh` for this close PR's mechanics.
 **Next:** TASK-005 — board template (`/`): three columns, card per task, badge
 markup, diagnostics banner; `html/template` + `go:embed` + Tailwind Play CDN.
 AC in `CURRENT.md`.
+
+---
+## 2026-07-20 15:11 — TASK-005 board template + badges + Tailwind
+
+**Task:** TASK-005
+**What I did:** Embedded `html/template` templates (`templates/layout.html` +
+`board.html`, `go:embed` from the `backlog` package — embed can't traverse `..`)
+and `render.go`: `viewModel` splits the `Board` into Backlog / In Progress /
+Done columns; `badgeClass`/`badgeText` map the five badge kinds to Tailwind
+colours (blocked red, parking slate, override amber, no-ac yellow, namespace
+gray). `handleBoard` renders into a buffer (clean 500 on template error) and the
+layout shows the planning-path header + a `/_diag` banner when warnings exist.
+
+**What I verified:** Local CI green. `TestBoardRender` (3 columns, 6 id-cards +
+links, blocked badge, namespace chip, header path, `/_diag`, Tailwind CDN) and
+`TestBoardEscaping` (a `<script>` in card text → `&lt;script&gt;`, never a live
+tag) pass. Binary smoke on the fixture: 200; DEMO-2 card shows red `blocked` +
+yellow `no-ac` + gray `DEMO` chips; parking card muted + unlinked; empty column
+→ "nothing here". **Dogfood** `bklg .` → this repo's board, 200, 3 columns, all
+7 `TASK-00N` cards linked. Fresh-context review: **PASS**, **zero findings** —
+included a hostile-input injection probe (titles/path/labels/pathological id in
+`href`) all escaped; `/_diag` stays text/plain; empty board safe.
+
+**What changed:** New `internal/backlog/render.go`,
+`templates/{layout,board}.html`; `server.go` (buffered board render, −placeholder);
+`server_test.go` (+render/escape tests). Delivery: **PR #9, merged `a9a1fc3`**.
+
+**What I learned:** Separate `template.Template` sets per page (boardTmpl now,
+taskTmpl in TASK-006) let each define `content` without collision — the clean
+way to share a `layout` across pages in `html/template`. Buffered render is the
+right default: a template error becomes a 500 instead of a half-written page.
+
+**Next:** TASK-006 — task detail (`/{id}`, case-insensitive) + 404;
+state-appropriate fields, referencing blockers (open first), collapsed Raw
+block. Reinstate `Board.CardByRawID`. AC in `CURRENT.md`.
