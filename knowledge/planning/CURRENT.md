@@ -24,7 +24,7 @@ one; see framework/delivery.md.)
 - [ ] AC5 — Loopback only: the listener binds `127.0.0.1`, not `0.0.0.0` (spec §9). (Decider: code passes `127.0.0.1:<port>` to the server; `curl http://127.0.0.1:9001/` → 200 confirms loopback reachability.)
 
 **Notes:**
-- Creates `go.mod` (`module github.com/gillchristian/bklg`, `go 1.22`), `cmd/bklg/main.go`, and an embedded-templates seam (even a placeholder) so later tasks slot in.
+- Creates `go.mod` (`module github.com/gillchristian/bklg`, `go 1.22`) and `cmd/bklg/main.go`. **Scope refinement (2026-07-20):** the `go:embed` templates seam is deferred to TASK-005, where real templates arrive — planting a placeholder now would only be churned then, and TASK-001's AC don't need it. `/` returns a minimal static HTML placeholder for now.
 - Flag defaults per spec §9: `--port` 1235, `--dir` knowledge. First startup line is literally `Running Backlog on port N` (§9 wording — "Backlog", not "bklg").
 - Resolution here is the **skeleton** only: echo `path/dir`, `path/dir/planning`, `path/dir/progress` as plain defaults, with **no** Locations dereference and **no** existence checks — real resolution (Locations, fallback, root-manifest system list) is TASK-002.
 - `splitArgs` per spec §9 (pre-split argv, ~15 lines, zero deps) so `flag` doesn't choke on a positional after flags.
