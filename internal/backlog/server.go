@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // Server serves the board for one resolved instance. It re-parses on every
@@ -26,13 +27,14 @@ func (s *Server) board() Board {
 	return b
 }
 
-// Routes wires the mux. Literal segments beat the {id} wildcard, so /_v and
-// /_diag win over /{id} without ordering tricks (spec §7). /{$} matches exactly
-// "/". Board (/) and detail (/{id}) render in later slices.
+// Routes wires the mux. Literal segments beat the {id} wildcard, so /_diag
+// (and /_v, added in TASK-007) win over /{id} without ordering tricks (spec §7).
+// /{$} matches exactly "/".
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.handleBoard)
 	mux.HandleFunc("GET /_diag", s.handleDiag)
+	mux.HandleFunc("GET /{id}", s.handleTask)
 	return mux
 }
 
@@ -41,6 +43,44 @@ func (s *Server) Routes() http.Handler {
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	if err := boardTmpl.ExecuteTemplate(&buf, "layout", viewModel(s.board())); err != nil {
+		http.Error(w, "bklg: render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	buf.WriteTo(w)
+}
+
+// handleTask renders one task's detail page (spec §7). The id is matched
+// case-insensitively; an unknown id (or a parking/id-less card) is a 404.
+func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
+	b := s.board()
+	card, ok := b.CardByRawID(r.PathValue("id"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Blockers referencing this card, open first then resolved.
+	var refs []Blocker
+	for _, open := range []bool{true, false} {
+		for _, bl := range b.Blockers {
+			if bl.Open != open {
+				continue
+			}
+			if pid := parseID(strings.ToUpper(bl.TaskRaw)); pid != nil && card.ID != nil && pid.Raw == strings.ToUpper(card.ID.Raw) {
+				refs = append(refs, bl)
+			}
+		}
+	}
+
+	vm := taskVM{
+		PlanningDir: DisplayPath(b.Meta.PlanningDir),
+		Warnings:    b.Warnings,
+		Card:        *card,
+		Blockers:    refs,
+	}
+	var buf bytes.Buffer
+	if err := taskTmpl.ExecuteTemplate(&buf, "layout", vm); err != nil {
 		http.Error(w, "bklg: render error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
