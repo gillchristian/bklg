@@ -43,10 +43,17 @@ not guesses.
    `→`-style arrows appear raw on cards and detail. A safe markdown subset would
    make these readable. → **TASK-010.**
 
-5. **`/_diag` is noisy and not actionable.** The 15 warnings above are almost all
-   the DONE-format false positive; even real warnings don't say *what to do* or
-   link to the offending file/card. → **TASK-011** (and TASK-009 removes the bulk
-   of the noise at the source).
+5. **`/_diag` is noisy and not actionable.** ~~almost all the DONE-format false
+   positive~~ **Corrected during TASK-009:** trail's DONE.md contains **only**
+   TRACK-000; TRACK-001…014 live solely in their rich `[x]` BACKLOG lines, never
+   duplicated into DONE.md. So only *one* of the 15 warnings was a format
+   parse-failure (fixed by TASK-009); the other 14 are the "shipped item missing
+   from DONE.md" check **correctly** firing against a repo that diverges from the
+   skeleton convention ("the full record lives in DONE.md"). Reducing that noise
+   is a **policy** decision — suppress/downgrade when the `[x]` line already
+   carries a full record, and/or make each warning link to the file + say what to
+   do. → **TASK-011.** (TASK-009 only removes the genuine parse-failure + gives
+   real warnings; it is *not* the bulk fix I first assumed.)
 
 6. **Root manifest errors instead of aggregating.** `bklg` at the trail root
    prints the per-system invocation list (v1 behaviour, spec §13.1). The user
