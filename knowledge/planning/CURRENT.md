@@ -14,17 +14,17 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-010 — Render a safe markdown subset
-**Source:** BACKLOG (v2 feedback; `../whiteboard/trail-instance-findings.md` #4)
+### TASK-011 — Make /_diag actionable
+**Source:** BACKLOG (v2 feedback; `../whiteboard/trail-instance-findings.md` #5)
 **Acceptance criteria:**
-- [ ] AC1 — Inline markdown renders: `**bold**`/`__b__` → `<strong>`, `*italic*`/`_i_` → `<em>`, `` `code` `` → `<code>`, `[text](url)` → `<a>` — in card titles and the detail fields (title, summary, notes, acceptance text, blocker body). (Decider: a render/unit test asserts the tags for a markdown input.)
-- [ ] AC2 — **Escape-first safety (no injection):** the renderer HTML-escapes the input **before** applying any markdown transform, so raw repo HTML never survives — `<script>` → `&lt;script&gt;`; a `[x](javascript:alert(1))` link is neutralized (unsafe scheme dropped); only whitelisted tags (`strong`/`em`/`code`/`a`) with escaped attributes are emitted. (Decider: unit test with hostile inputs asserts no live `<script>`, no `javascript:` href; `go test` + the reviewer's probe.)
-- [ ] AC3 — Applied on real fields: on `trail --dir systems/track/knowledge`, `**Swift/iOS toolchain…**` shows as **bold**, `` `code` `` as code — not literal `**`/backticks. (Decider: binary smoke — card/detail HTML contains `<strong>`, no literal `**` in the rendered field.)
-- [ ] AC4 — Trim + markdown compose safely: the board still trims (`truncate` then render), and an unmatched marker left by truncation stays **literal** (no unclosed `<strong>`/broken tag). (Decider: render test on a long bold title asserts no unclosed tag; matched-pairs-only rule.)
-- [ ] AC5 — ADR-0002 records the decision: **hand-rolled strict inline subset, stdlib-only** (keep the brief's zero-dep hard constraint) vs. pulling in goldmark + a sanitizer. (Decider: `decisions/0002-*.md` exists + indexed.)
+- [ ] AC1 — Structured warnings: `Board.Warnings` is `[]Warning{Kind, Message, TaskRaw}`; `readArea`/`parseDone`/`reconcile` populate `Kind` (e.g. `shipped-missing-done`, `done-not-ticked`, `current-multiple`, `read-error`, `malformed-done`) and `TaskRaw` (the id, when one is involved). (Decider: unit test asserts the fixture's warnings carry the right Kinds + TaskRaw.)
+- [ ] AC2 — `/_diag` renders an HTML page (via the layout) that **groups** warnings by Kind, with a **count** per group and a one-line **explanation** of what it means and what to do. (Decider: `curl -s /_diag` on the fixture shows the three groups with counts + explanations.)
+- [ ] AC3 — Actionable links: every warning referencing a task id links to that task's detail page. (Decider: `curl -s /_diag` contains `href="/DEMO-5"`, `href="/DEMO-6"`, etc.)
+- [ ] AC4 — "missing from DONE.md" reframed as informational: its explanation notes it's expected when a repo keeps the full record inline on the `[x]` line rather than duplicating into DONE.md (not a hard error). (Decider: the explanation text is present in `/_diag`.)
+- [ ] AC5 — Real-repo effect: on `trail --dir systems/track/knowledge`, `/_diag` shows the 14 shipped-missing warnings as **one grouped section (14) with linked ids + the explanation**, not 14 alarming raw lines; the header banner still links `/_diag`. (Decider: trail smoke — one group, 14 links, explanation present.)
 
 **Notes:**
-- **Zero-dep fork (the consequential one):** default = hand-roll a small, safe inline renderer, keeping "zero Go module deps" (a brief hard constraint). Safe because it **escapes first** (`html.EscapeString`) then applies a whitelist of inline patterns on the escaped text, returning `template.HTML`. Do NOT relax zero-dep without a strong reason — record the call in ADR-0002.
-- `renderMarkdown(s) template.HTML` in `render.go`; register as a `md` template func. Order: escape → protect code spans → links (validate scheme: allow http/https/mailto/relative `#`,`/`; escape href) → bold → italic. Unmatched markers stay literal (matched-pairs-only) → AC4.
-- Compose with trim in `board.html`: `{{md (truncate .Title 140)}}`. Detail uses `{{md .Card.Title}}` etc. Introducing `template.HTML` bypasses auto-escaping, so the escape-first discipline is load-bearing — this is the one place to be paranoid; expect a hard security review.
-- Scope v1 to **inline** markdown (bold/italic/code/links). Block-level lists/headings are a follow-up (note in parking if wanted). Line breaks already preserved via `whitespace-pre-wrap` where used.
+- Model: new `Warning{Kind, Message, TaskRaw string}`; `Board.Warnings []Warning`. Update the few producers (`readArea` → read-error; `parseDone` → malformed-done; `reconcile` → shipped-missing-done / done-not-ticked / current-multiple with `TaskRaw`). The layout banner just needs `len(.Warnings)` — unchanged.
+- `/_diag`: build a `diagVM` grouping `[]Warning` by Kind → `{Title, Explanation, []Warning}`; render an HTML page (reuse `layout`; a new `diag.html` defining `content`). Each `TaskRaw` → `<a href="/{id}">`. A small `explain(kind)` map supplies titles + how-to-fix text. Keep it escaped/safe (ids via the same route key; text via auto-escape).
+- Don't add a fragile suppression heuristic for shipped-missing — grouping + explanation is the fix (honest + actionable). If a repo wants the check off entirely, that's a future config flag (parking), not this task.
+- Update `TestParseWarnings` (assert on `w.Kind`/`w.Message`) and `TestDiagRoute` (assert the grouped HTML + links) for the new shape.
