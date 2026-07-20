@@ -479,3 +479,33 @@ merged `ff2ea83`**.
 **Next:** TASK-011 — make `/_diag` actionable: structured `[]Warning` grouped by
 kind, counts, explanations, id links; reframe "missing from DONE.md". AC in
 `CURRENT.md`.
+
+---
+## 2026-07-20 17:30 — TASK-011 actionable /_diag
+
+**Task:** TASK-011
+**What I did:** Structured `Board.Warnings` into `[]Warning{Kind,Message,TaskRaw}`
+(readArea→read-error, parseDone→malformed-done, reconcile→shipped-missing-done/
+done-not-ticked/current-multiple). `/_diag` is now an HTML page (`diag.html` via
+the layout) grouping by kind with counts + explanations + id links;
+`buildDiagVM` in render.go. shipped-missing reframed as informational.
+
+**What I verified:** Local CI green (48 tests). `TestWarningKinds`, rewritten
+`TestDiagRoute` (HTML, groups, links, escaped message). Real trail: 14
+shipped-missing → one "Shipped, but not in DONE.md (14)" group with 14 TRACK-
+links + explanation. Fresh-context review PASS (Message auto-escaped, href
+URL-normalized); fixed a latent map-order nondeterminism (sort unknown kinds).
+
+**What changed:** `model.go` (Warning type), `parse.go` (structured producers),
+`render.go` (diagVM/buildDiagVM/diagTmpl + VM Warnings type + sort), `server.go`
+(handleDiag HTML), `templates/diag.html` (new), tests. Delivery: **PR #22,
+merged `ce95127`**.
+
+**What I learned:** Structured warnings pay off immediately — grouping +
+explanation turned 15 scary lines into one informational section. The `>`-in-
+message escaping tripped a test assertion (literal `>` vs rendered `&gt;`) —
+good reminder that auto-escaping applies to my own diagnostic strings too.
+
+**Next:** TASK-012 (final) — multi-system board: aggregate all `systems/*` at a
+root manifest + `?system=` filter + per-card system chip; ADR-0003. AC in
+`CURRENT.md`.

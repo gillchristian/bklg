@@ -14,17 +14,18 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-011 — Make /_diag actionable
-**Source:** BACKLOG (v2 feedback; `../whiteboard/trail-instance-findings.md` #5)
+### TASK-012 — Multi-system board (aggregate + filter)
+**Source:** BACKLOG (v2 feedback #1; spec §13.1; `../whiteboard/trail-instance-findings.md` #6)
 **Acceptance criteria:**
-- [ ] AC1 — Structured warnings: `Board.Warnings` is `[]Warning{Kind, Message, TaskRaw}`; `readArea`/`parseDone`/`reconcile` populate `Kind` (e.g. `shipped-missing-done`, `done-not-ticked`, `current-multiple`, `read-error`, `malformed-done`) and `TaskRaw` (the id, when one is involved). (Decider: unit test asserts the fixture's warnings carry the right Kinds + TaskRaw.)
-- [ ] AC2 — `/_diag` renders an HTML page (via the layout) that **groups** warnings by Kind, with a **count** per group and a one-line **explanation** of what it means and what to do. (Decider: `curl -s /_diag` on the fixture shows the three groups with counts + explanations.)
-- [ ] AC3 — Actionable links: every warning referencing a task id links to that task's detail page. (Decider: `curl -s /_diag` contains `href="/DEMO-5"`, `href="/DEMO-6"`, etc.)
-- [ ] AC4 — "missing from DONE.md" reframed as informational: its explanation notes it's expected when a repo keeps the full record inline on the `[x]` line rather than duplicating into DONE.md (not a hard error). (Decider: the explanation text is present in `/_diag`.)
-- [ ] AC5 — Real-repo effect: on `trail --dir systems/track/knowledge`, `/_diag` shows the 14 shipped-missing warnings as **one grouped section (14) with linked ids + the explanation**, not 14 alarming raw lines; the header banner still links `/_diag`. (Decider: trail smoke — one group, 14 links, explanation present.)
+- [ ] AC1 — Root manifest aggregates instead of erroring: `bklg <repo>` at a monorepo root (planning area absent, a `systems/<name>` index present) resolves **each** system's instance and serves **one** board combining all their cards, rather than the v1 exit-with-list. (Decider: `bklg /Users/bb8/dev/trail` → HTTP 200 board; cards from ≥2 systems present.)
+- [ ] AC2 — Per-card system chip: in aggregate mode each card shows which system it came from (e.g. `track`). Single-system mode is unchanged (no chip). (Decider: board HTML shows a `track` chip on a track card; the single-system fixture board has no system chip.)
+- [ ] AC3 — Filter to one project: `GET /?system=<name>` shows only that system's cards; a filter bar links each system (+ "All"). (Decider: `/?system=track` shows only track cards; `/` shows all; the bar lists the systems.)
+- [ ] AC4 — Detail + `/_v` across systems: `/<id>` resolves against the aggregated cards (renders, with the system chip); `/_v` is the max mtime across **all** systems' files. (Decider: a known aggregated id → 200 detail; `/_v` changes when any system's file changes.)
+- [ ] AC5 — ADR-0003 records the design: root-manifest auto-aggregates; server-side `?system=` filter (no client JS); per-card `System` tag/chip; detail global lookup (cross-system id-collision caveat noted). A system in the index that fails to resolve is skipped with a `/_diag` warning, not a crash. (Decider: `decisions/0003-*.md` exists + indexed; a bogus system entry → warning, board still serves.)
 
 **Notes:**
-- Model: new `Warning{Kind, Message, TaskRaw string}`; `Board.Warnings []Warning`. Update the few producers (`readArea` → read-error; `parseDone` → malformed-done; `reconcile` → shipped-missing-done / done-not-ticked / current-multiple with `TaskRaw`). The layout banner just needs `len(.Warnings)` — unchanged.
-- `/_diag`: build a `diagVM` grouping `[]Warning` by Kind → `{Title, Explanation, []Warning}`; render an HTML page (reuse `layout`; a new `diag.html` defining `content`). Each `TaskRaw` → `<a href="/{id}">`. A small `explain(kind)` map supplies titles + how-to-fix text. Keep it escaped/safe (ids via the same route key; text via auto-escape).
-- Don't add a fragile suppression heuristic for shipped-missing — grouping + explanation is the fix (honest + actionable). If a repo wants the check off entirely, that's a future config flag (parking), not this task.
-- Update `TestParseWarnings` (assert on `w.Kind`/`w.Message`) and `TestDiagRoute` (assert the grouped HTML + links) for the new shape.
+- Reuse `Resolve(path, sys+"/knowledge")` per system from `RootManifestError.Systems`. Add `Card.System string` (empty single-system → no chip/filter). New server mode: `NewMultiServer(path, systems)` resolving each; `board()` parses each, tags `System`, concatenates (no cross-system dedup — namespaces differ per system; each system's board is already deduped). `main`: on `RootManifestError`, build a multi-server instead of exiting; startup block notes "aggregate: N systems".
+- Filter server-side: `?system=` filters the aggregated cards at render; a `systemFilter` bar in `boardVM` (name, count, active, href). `/_diag` aggregates warnings (tag each with its system? keep simple: prefix Message or add a system field — minimal). `/_v` = max over all systems.
+- Detail: search aggregated cards for the id (case-insensitive). Cross-system collision (same namespace+number in two systems) is unlikely (namespaces differ); first match wins — note in the ADR.
+- A system whose instance won't resolve (missing planning) → skip + warning, don't fail the whole board.
+- Biggest task; if it grows past one clean slice, split (e.g. aggregate-core vs filter-UI) — but aim to land it whole. Record ADR-0003 with the design forks (this is the "sane defaults + ADR" the user opted into).
