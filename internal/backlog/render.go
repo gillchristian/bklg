@@ -3,6 +3,8 @@ package backlog
 import (
 	"embed"
 	"html/template"
+	"strconv"
+	"time"
 )
 
 //go:embed templates
@@ -26,11 +28,22 @@ var (
 	)
 )
 
+// versionString renders a freshness stamp for /_v and the poll script: the max
+// mtime as UnixNano, or "0" when there are no files. The page bakes this in and
+// /_v returns the same computation, so equality means "unchanged".
+func versionString(t time.Time) string {
+	if t.IsZero() {
+		return "0"
+	}
+	return strconv.FormatInt(t.UnixNano(), 10)
+}
+
 // boardVM is the board's view model: the three columns in flow order, plus the
-// header/banner inputs.
+// header/banner inputs and the live-reload version.
 type boardVM struct {
 	PlanningDir string
 	Warnings    []string
+	Version     string
 	Columns     []columnVM
 }
 
@@ -45,6 +58,7 @@ type columnVM struct {
 type taskVM struct {
 	PlanningDir string
 	Warnings    []string
+	Version     string
 	Card        Card
 	Blockers    []Blocker
 }
@@ -64,6 +78,7 @@ func viewModel(b Board) boardVM {
 	return boardVM{
 		PlanningDir: DisplayPath(b.Meta.PlanningDir),
 		Warnings:    b.Warnings,
+		Version:     versionString(b.Meta.LatestMTime),
 		Columns:     cols,
 	}
 }

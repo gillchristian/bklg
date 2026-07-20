@@ -20,5 +20,16 @@
   </header>
   {{template "content" .}}
 </div>
+<script>
+(function () {
+  var v = "{{.Version}}";
+  setInterval(function () {
+    fetch("/_v", { cache: "no-store" })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { if (t.trim() !== v) location.reload(); })
+      .catch(function () {});
+  }, 3000);
+})();
+</script>
 </body>
 </html>{{end}}

@@ -33,9 +33,18 @@ func (s *Server) board() Board {
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.handleBoard)
+	mux.HandleFunc("GET /_v", s.handleVersion)
 	mux.HandleFunc("GET /_diag", s.handleDiag)
 	mux.HandleFunc("GET /{id}", s.handleTask)
 	return mux
+}
+
+// handleVersion returns the max mtime across the parsed files as a bare integer
+// (spec §7). Cheap — it stats the files rather than reparsing — so the page can
+// poll it every few seconds and reload on change.
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprint(w, versionString(areaMTime(s.areas)))
 }
 
 // handleBoard renders the three-column board. It renders into a buffer first so
@@ -76,6 +85,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	vm := taskVM{
 		PlanningDir: DisplayPath(b.Meta.PlanningDir),
 		Warnings:    b.Warnings,
+		Version:     versionString(b.Meta.LatestMTime),
 		Card:        *card,
 		Blockers:    refs,
 	}

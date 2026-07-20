@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Parser turns a resolved instance into a Board. The line scanner below is the
@@ -47,7 +48,28 @@ func (lineParser) Parse(a Areas) (Board, error) {
 	b.Blockers = parseBlockers(readArea(a.ProgressDir, "blockers.md", &b.Warnings))
 	computeBadges(cards, b.Blockers)
 	b.Cards = cards
+	b.Meta.LatestMTime = areaMTime(a)
 	return b, nil
+}
+
+// areaMTime is the newest modification time across the parsed files — the
+// freshness stamp behind /_v. Cheap (4 stats), so /_v can poll without a full
+// parse. Missing files are skipped.
+func areaMTime(a Areas) time.Time {
+	var latest time.Time
+	for _, p := range []string{
+		filepath.Join(a.PlanningDir, "CURRENT.md"),
+		filepath.Join(a.PlanningDir, "BACKLOG.md"),
+		filepath.Join(a.PlanningDir, "DONE.md"),
+		filepath.Join(a.ProgressDir, "blockers.md"),
+	} {
+		if fi, err := os.Stat(p); err == nil {
+			if m := fi.ModTime(); m.After(latest) {
+				latest = m
+			}
+		}
+	}
+	return latest
 }
 
 // readArea reads a planning/progress file; a read error is a warning, not a
