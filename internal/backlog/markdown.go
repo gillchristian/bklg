@@ -22,6 +22,11 @@ import (
 // mid-`**` can't produce an unclosed tag. Block constructs (lists/headings) are
 // out of scope for v1.
 func renderMarkdown(s string) template.HTML {
+	// Drop NUL bytes up front: the code-span placeholder is \x00N\x00, and
+	// html.EscapeString does not touch NUL, so a source file containing literal
+	// NUL could otherwise collide with / spoof a placeholder. NUL in a markdown
+	// doc is pathological; stripping it removes the corruption vector entirely.
+	s = strings.ReplaceAll(s, "\x00", "")
 	out := html.EscapeString(s)
 
 	// 1) Code spans first, lifted out to placeholders so their contents aren't
@@ -68,10 +73,15 @@ var (
 // vbscript:, …) are rejected so a repo can't inject a script link.
 func safeURL(u string) bool {
 	u = strings.TrimSpace(u)
+	if strings.Contains(u, `\`) {
+		return false // browsers may treat backslash as '/' -> off-site
+	}
 	low := strings.ToLower(u)
 	switch {
 	case strings.HasPrefix(low, "http://"), strings.HasPrefix(low, "https://"), strings.HasPrefix(low, "mailto:"):
 		return true
+	case strings.HasPrefix(u, "//"):
+		return false // protocol-relative -> off-site navigation
 	case strings.HasPrefix(u, "/"), strings.HasPrefix(u, "#"):
 		return true
 	case !strings.Contains(u, ":"):

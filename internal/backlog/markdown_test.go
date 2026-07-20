@@ -86,9 +86,20 @@ func TestSafeURL(t *testing.T) {
 			t.Errorf("safeURL(%q) = false, want true", u)
 		}
 	}
-	for _, u := range []string{"javascript:alert(1)", "data:text/html,x", "vbscript:x", "JAVASCRIPT:x", " javascript:x"} {
+	for _, u := range []string{"javascript:alert(1)", "data:text/html,x", "vbscript:x", "JAVASCRIPT:x", " javascript:x", "//evil.com", `\evil.com`, `\\evil.com`, `/\evil.com`} {
 		if safeURL(u) {
 			t.Errorf("safeURL(%q) = true, want false", u)
 		}
+	}
+}
+
+// A planted placeholder sentinel (\x00N\x00) must not spoof a code span or leak.
+func TestRenderMarkdownNULSafe(t *testing.T) {
+	if got := string(renderMarkdown("plain \x000\x00 text")); strings.Contains(got, "<code>") || strings.Contains(got, "\x00") {
+		t.Errorf("planted NUL sentinel corrupted output: %q", got)
+	}
+	got := string(renderMarkdown("`real` \x000\x00"))
+	if strings.Count(got, "<code>") != 1 || strings.Contains(got, "\x00") {
+		t.Errorf("want exactly one code span and no NUL, got %q", got)
 	}
 }
