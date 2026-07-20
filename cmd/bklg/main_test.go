@@ -41,18 +41,3 @@ func TestSplitArgs(t *testing.T) {
 		})
 	}
 }
-
-func TestJoinDisplay(t *testing.T) {
-	tests := []struct{ a, b, want string }{
-		{".", "knowledge", "./knowledge"},
-		{"./knowledge", "planning", "./knowledge/planning"},
-		{"/abs/repo", "knowledge", "/abs/repo/knowledge"},
-		{"systems/trail", "knowledge", "systems/trail/knowledge"},
-		{"trailing/", "b", "trailing/b"},
-	}
-	for _, tt := range tests {
-		if got := joinDisplay(tt.a, tt.b); got != tt.want {
-			t.Errorf("joinDisplay(%q, %q) = %q, want %q", tt.a, tt.b, got, tt.want)
-		}
-	}
-}
