@@ -74,6 +74,24 @@ func TestParseIDEmphasis(t *testing.T) {
 	}
 }
 
+// parseIDTitle must give the right title even for a decorated id with no
+// separator (regression: it used to slice from index 0 and emit garbage).
+func TestParseIDTitleDecorated(t *testing.T) {
+	cases := []struct{ in, id, title string }{
+		{"**WI-8**", "WI-8", ""},     // no separator, decorated -> empty title (not "8**")
+		{"*GW-12*", "GW-12", ""},     // ditto
+		{"`TRACK-1`", "TRACK-1", ""}, // ditto
+		{"TRACK-0 — plain", "TRACK-0", "plain"},
+		{"**WI-8 — .trace**", "WI-8", ".trace**"}, // em-dash branch keeps trailing markdown for TASK-010
+	}
+	for _, c := range cases {
+		id, title := parseIDTitle(c.in)
+		if id == nil || id.Raw != c.id || title != c.title {
+			t.Errorf("parseIDTitle(%q) = (%v, %q), want (%s, %q)", c.in, id, title, c.id, c.title)
+		}
+	}
+}
+
 // AC2: a "### " line in the body doesn't create phantom bullet entries, and the
 // bullet format still works when there are no headings.
 func TestParseDoneFormatExclusivity(t *testing.T) {

@@ -131,7 +131,10 @@ func parseIDTitle(s string) (*ID, string) {
 		return id, strings.TrimSpace(s[i+len(emDash):])
 	}
 	if id != nil {
-		return id, strings.TrimSpace(s[len(id.Raw):])
+		// id.Raw may not sit at index 0 — parseID strips leading decoration — so
+		// locate it in the stripped string rather than slicing from the start.
+		rest := strings.TrimPrefix(strings.TrimLeft(s, "*`_ "), id.Raw)
+		return id, strings.Trim(rest, "*`_ ")
 	}
 	return id, s
 }
