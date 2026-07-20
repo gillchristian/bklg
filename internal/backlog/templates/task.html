@@ -7,18 +7,18 @@
   </div>
   {{end}}
   <h1 class="text-lg font-semibold leading-snug">
-    {{with .Card.ID}}<span class="font-mono text-sm text-gray-500">{{.Raw}}</span> · {{end}}{{.Card.Title}}
+    {{with .Card.ID}}<span class="font-mono text-sm text-gray-500">{{.Raw}}</span> · {{end}}{{md .Card.Title}}
   </h1>
   <p class="text-sm text-gray-500 mt-0.5">{{.Card.Column}}{{with .Card.ID}} · namespace {{.Namespace}}{{end}}</p>
 
-  {{if .Card.Source}}<p class="mt-4 text-sm"><span class="font-medium">Source:</span> {{.Card.Source}}</p>{{end}}
+  {{if .Card.Source}}<p class="mt-4 text-sm"><span class="font-medium">Source:</span> {{md .Card.Source}}</p>{{end}}
 
   {{if .Card.Acceptance}}
   <div class="mt-4">
     <h2 class="text-sm font-medium mb-1">Acceptance criteria</h2>
     <ul class="space-y-1">
       {{range .Card.Acceptance}}
-      <li class="text-sm flex gap-2"><span class="select-none">{{if .Checked}}☑{{else}}☐{{end}}</span><span>{{.Text}}</span></li>
+      <li class="text-sm flex gap-2"><span class="select-none">{{if .Checked}}☑{{else}}☐{{end}}</span><span>{{md .Text}}</span></li>
       {{end}}
     </ul>
   </div>
@@ -26,18 +26,18 @@
 
   {{if .Card.Notes}}
   <div class="mt-4 text-sm"><span class="font-medium">Notes:</span>
-    <div class="whitespace-pre-wrap text-gray-700">{{.Card.Notes}}</div>
+    <div class="whitespace-pre-wrap text-gray-700">{{md .Card.Notes}}</div>
   </div>
   {{end}}
 
   {{if .Card.DeliveryOverride}}
-  <p class="mt-4 text-sm text-amber-800"><span class="font-medium">Delivery override:</span> {{.Card.DeliveryOverride}}</p>
+  <p class="mt-4 text-sm text-amber-800"><span class="font-medium">Delivery override:</span> {{md .Card.DeliveryOverride}}</p>
   {{end}}
 
   {{with .Card.Done}}
   <div class="mt-4 text-sm space-y-1">
     <p><span class="font-medium">Date:</span> {{.Date}}</p>
-    <p><span class="font-medium">Summary:</span> {{.Summary}}</p>
+    <p><span class="font-medium">Summary:</span> {{md .Summary}}</p>
     <p><span class="font-medium">Delivered:</span> {{.DeliveryRecord}}</p>
     {{if .JournalPointer}}<p class="text-gray-500"><span class="font-medium">Journal:</span> {{.JournalPointer}}</p>{{end}}
   </div>
@@ -51,8 +51,8 @@
       <li class="text-sm border-l-2 pl-2 {{if .Open}}border-red-400{{else}}border-gray-300 text-gray-500{{end}}">
         <span class="font-mono text-xs">{{.ID.Raw}}</span>
         {{if .Open}}<span class="text-red-700 font-medium">open</span>{{else}}<span>resolved</span>{{end}}
-        {{if .Title}}· {{.Title}}{{end}}
-        {{if .Body}}<div class="whitespace-pre-wrap text-gray-600 mt-0.5">{{.Body}}</div>{{end}}
+        {{if .Title}}· {{md .Title}}{{end}}
+        {{if .Body}}<div class="whitespace-pre-wrap text-gray-600 mt-0.5">{{md .Body}}</div>{{end}}
       </li>
       {{end}}
     </ul>

@@ -22,3 +22,7 @@ should be able to understand later without asking.
 - [0001](0001-widen-input-contract.md) — Widen the input contract beyond the
   framework skeleton (heading-style DONE entries + emphasized ids); keep the
   zero-dep line-scanner, defer goldmark (D4). **accepted**, 2026-07-20.
+- [0002](0002-safe-inline-markdown-stdlib.md) — Hand-rolled safe inline markdown
+  (escape-first + tag whitelist + href scheme-check), stdlib-only; keep the
+  zero-dep constraint rather than pull in goldmark + a sanitizer. **accepted**,
+  2026-07-20.
