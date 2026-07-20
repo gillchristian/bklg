@@ -118,7 +118,7 @@ func TestParseWarnings(t *testing.T) {
 	for _, sub := range wantSub {
 		found := false
 		for _, w := range b.Warnings {
-			if strings.Contains(w, sub) {
+			if strings.Contains(w.Message, sub) {
 				found = true
 				break
 			}
@@ -129,6 +129,24 @@ func TestParseWarnings(t *testing.T) {
 	}
 	if len(b.Warnings) != 3 {
 		t.Errorf("warnings=%d (%v), want exactly 3", len(b.Warnings), b.Warnings)
+	}
+}
+
+// AC1: warnings are structured with a Kind and (where relevant) the linkable id.
+func TestWarningKinds(t *testing.T) {
+	b := board(t)
+	byKind := map[string]string{}
+	for _, w := range b.Warnings {
+		byKind[w.Kind] = w.TaskRaw
+	}
+	if _, ok := byKind["current-multiple"]; !ok {
+		t.Error("missing current-multiple warning")
+	}
+	if byKind["shipped-missing-done"] != "DEMO-5" {
+		t.Errorf("shipped-missing-done TaskRaw = %q, want DEMO-5", byKind["shipped-missing-done"])
+	}
+	if byKind["done-not-ticked"] != "DEMO-6" {
+		t.Errorf("done-not-ticked TaskRaw = %q, want DEMO-6", byKind["done-not-ticked"])
 	}
 }
 
@@ -275,7 +293,7 @@ func TestReconcileShippedInCurrentKeepsDetail(t *testing.T) {
 	}
 	shipped := 0
 	for _, w := range warns {
-		if strings.Contains(w, "shipped item missing from DONE.md") {
+		if w.Kind == "shipped-missing-done" {
 			shipped++
 		}
 	}
@@ -294,7 +312,7 @@ func TestReconcileNoDuplicateWarnings(t *testing.T) {
 	_, warns := reconcile(nil, backlog, nil)
 	shipped := 0
 	for _, w := range warns {
-		if strings.Contains(w, "shipped item missing from DONE.md: DEMO-9") {
+		if w.Kind == "shipped-missing-done" && w.TaskRaw == "DEMO-9" {
 			shipped++
 		}
 	}

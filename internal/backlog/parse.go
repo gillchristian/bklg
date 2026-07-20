@@ -74,10 +74,10 @@ func areaMTime(a Areas) time.Time {
 
 // readArea reads a planning/progress file; a read error is a warning, not a
 // crash — the board degrades rather than blanking (spec §2, parse defensively).
-func readArea(dir, name string, warnings *[]string) string {
+func readArea(dir, name string, warnings *[]Warning) string {
 	data, err := os.ReadFile(filepath.Join(dir, name))
 	if err != nil {
-		*warnings = append(*warnings, "could not read "+name+": "+err.Error())
+		*warnings = append(*warnings, Warning{Kind: "read-error", Message: "could not read " + name + ": " + err.Error()})
 		return ""
 	}
 	return string(data)
@@ -267,9 +267,14 @@ func parseBacklog(md string) []backlogItem {
 // "- <ID> — <title> — <date> — <summary> — <delivery record>. See journal …".
 // Date is the 3rd field and the delivery record is the last, so a summary that
 // itself contains " — " is still split correctly (spec §2 robustness).
-func parseDone(md string) ([]Card, []string) {
+func parseDone(md string) ([]Card, []Warning) {
 	var cards []Card
-	var warnings []string
+	var warnings []Warning
+	addWarn := func(msg string) {
+		if msg != "" {
+			warnings = append(warnings, Warning{Kind: "malformed-done", Message: msg})
+		}
+	}
 	for _, sec := range splitSections(md) {
 		if sec.name != "Completed" {
 			continue
@@ -289,9 +294,7 @@ func parseDone(md string) ([]Card, []string) {
 			for _, block := range splitBlocks(sec.lines, "### ") {
 				card, warn := parseDoneHeading(block)
 				cards = append(cards, card)
-				if warn != "" {
-					warnings = append(warnings, warn)
-				}
+				addWarn(warn)
 			}
 			continue
 		}
@@ -302,9 +305,7 @@ func parseDone(md string) ([]Card, []string) {
 			}
 			card, warn := parseDoneEntry(t, ln)
 			cards = append(cards, card)
-			if warn != "" {
-				warnings = append(warnings, warn)
-			}
+			addWarn(warn)
 		}
 	}
 	return cards, warnings
@@ -404,8 +405,8 @@ func parseDoneEntry(trimmed, raw string) (Card, string) {
 
 // reconcile merges CURRENT/BACKLOG/DONE into one card per id in its furthest
 // column (Done > InProgress > Backlog) and emits the three hygiene warnings.
-func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []string) {
-	var warns []string
+func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []Warning) {
+	var warns []Warning
 	var cards []Card
 	seen := map[string]bool{} // ids already placed in their furthest column
 
@@ -429,7 +430,7 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 	}
 
 	if len(current) > 1 {
-		warns = append(warns, "CURRENT holds >1 active task (framework one-task invariant)")
+		warns = append(warns, Warning{Kind: "current-multiple", Message: "CURRENT holds >1 active task (framework one-task invariant)"})
 	}
 
 	// Done column: real DONE entries first.
@@ -437,7 +438,7 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 		if d.ID != nil {
 			seen[d.ID.Raw] = true
 			if !backlogChecked[d.ID.Raw] {
-				warns = append(warns, "DONE item not ticked in BACKLOG: "+d.ID.Raw)
+				warns = append(warns, Warning{Kind: "done-not-ticked", Message: "DONE item not ticked in BACKLOG: " + d.ID.Raw, TaskRaw: d.ID.Raw})
 			}
 		}
 		cards = append(cards, d)
@@ -450,7 +451,7 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 			continue
 		}
 		seen[b.ID.Raw] = true
-		warns = append(warns, "shipped item missing from DONE.md: "+b.ID.Raw)
+		warns = append(warns, Warning{Kind: "shipped-missing-done", Message: "shipped item missing from DONE.md: " + b.ID.Raw, TaskRaw: b.ID.Raw})
 		if cc, ok := currentByID[b.ID.Raw]; ok {
 			cc.Column = ColDone
 			cards = append(cards, cc)

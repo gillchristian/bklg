@@ -98,16 +98,15 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	buf.WriteTo(w)
 }
 
-// handleDiag lists the parse warnings verbatim, one per line (spec §7). Plain
-// text — repo content is never rendered as HTML.
+// handleDiag renders the diagnostics page: warnings grouped by kind, each group
+// with a count, an explanation of what it means + how to fix it, and links from
+// id-bearing warnings to their task detail page (spec §7, made actionable).
 func (s *Server) handleDiag(w http.ResponseWriter, r *http.Request) {
-	b := s.board()
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	if len(b.Warnings) == 0 {
-		fmt.Fprintln(w, "no warnings")
+	var buf bytes.Buffer
+	if err := diagTmpl.ExecuteTemplate(&buf, "layout", buildDiagVM(s.board())); err != nil {
+		http.Error(w, "bklg: render error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	for _, warn := range b.Warnings {
-		fmt.Fprintln(w, warn)
-	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	buf.WriteTo(w)
 }
