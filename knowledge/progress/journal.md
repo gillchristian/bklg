@@ -358,3 +358,34 @@ genuinely useful confidence check.
 **Next:** Session envelope spent (MVP shipped). Stop. Future work: promote a
 parking-lot item (spec §13) in a new session — GitHub Actions CI would be a good
 first one (it makes delivery gate D3 real).
+
+---
+## 2026-07-20 16:02 — v2 feedback triaged into TASK-008…012
+
+**Task:** blocker triage / planning
+**What I did:** User reviewed the shipped MVP (happy) and gave feedback after
+running bklg against the real `trail` monorepo. Investigated
+`trail/systems/track/knowledge/planning`, recorded the concrete divergences in
+`whiteboard/trail-instance-findings.md`, and turned the feedback into five v2
+tasks: TASK-008 trim card text, TASK-009 parser robustness (real-instance
+formats), TASK-010 render markdown, TASK-011 make /_diag actionable, TASK-012
+multi-system board (aggregate + filter). Promoted the multi-system + markdown
+parking items to Active.
+
+**What I verified:** Read the real trail files (quoted in the whiteboard entry):
+`DONE.md` has **0** `- ` bullets — it uses `### TRACK-NNN — …` headings — so our
+parser finds no DONE entries → all 15 `[x]` backlog items fire the false
+"shipped item missing from DONE.md" warnings the user saw; parking ids look like
+`**WI-8 — …`; `[x]`/parking lines carry full paragraphs (the wall-of-text cards).
+
+**What changed:** `BACKLOG.md` (+5 v2 tasks, parking pruned),
+`whiteboard/{trail-instance-findings.md, README.md}`. Delivery: this docs PR.
+
+**What I learned:** v1's spec was keyed to the framework **skeleton**; real
+instances diverge, which is exactly what bklg must handle. The v2 parser work
+widens the §2 input contract — ADRs due (format-widening; markdown vs the
+zero-dep constraint). This is the trigger the D4 goldmark seam anticipated.
+
+**Next:** Asked the user whether to ship the v2 batch autonomously now (same
+PR-per-task flow), do only the quick trail-fixes and pause before the
+design-heavy multi-system feature, or leave it queued. Await steer.
