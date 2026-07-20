@@ -22,7 +22,7 @@ TASK-002, the rich parser/demo instance in TASK-003 — not as a separate task.
 - [x] TASK-004 — Blocker parse + blocked join — parse `blockers.md` (§/blocker heading disambiguation), attach the `blocked` badge to open-blocker tasks; `/_diag` shows warnings. — **PR #7, merged `835363f`**
 - [x] TASK-005 — Board template + badges + Tailwind — render `/` (three columns, card per task, badge markup, namespace chip, diagnostics banner) via `html/template` + Tailwind Play CDN. — **PR #9, merged `a9a1fc3`**
 - [x] TASK-006 — Task detail + 404 — render `/{id}` (state-appropriate fields, referencing blockers, collapsed Raw block); unknown id → 404. — **PR #11, merged `cd00f36`**
-- [ ] TASK-007 — Live reload — `/_v` returns max mtime across parsed files; page polls ~3s and `location.reload()`s on change.
+- [x] TASK-007 — Live reload — `/_v` returns max mtime across parsed files; page polls ~3s and `location.reload()`s on change. — **PR #13, merged `14b1df6`**
 
 ## Parking lot
 

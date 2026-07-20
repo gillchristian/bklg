@@ -297,3 +297,64 @@ zero `template.HTML`.
 
 **Next:** TASK-007 (final MVP task) — live reload: `/_v` max-mtime endpoint +
 ~3s poll → `location.reload()`; compute `Meta.LatestMTime`. AC in `CURRENT.md`.
+
+---
+## 2026-07-20 15:35 — TASK-007 live reload
+
+**Task:** TASK-007
+**What I did:** `areaMTime(Areas)` = max mtime across CURRENT/BACKLOG/DONE/
+blockers (4 stats); `Parse` sets `Board.Meta.LatestMTime`. `GET /_v` →
+`versionString(areaMTime)` (bare UnixNano int, text/plain) — stats, doesn't
+reparse, so polling is cheap. Both view models carry `Version`; `layout.html`
+embeds ~8 lines of vanilla JS: `fetch("/_v",{cache:"no-store"})` every 3s →
+`location.reload()` when the value differs from the baked-in one.
+
+**What I verified:** Local CI green. `version_test.go`: `TestMetaLatestMTime`
+(== max of 4 files), `TestVersionRoute` (200/text-plain/`^-?\d+$`),
+`TestPollScript` (script present, baked `var v` == `/_v`),
+`TestVersionChangesOnModify` (deterministic via `Chtimes` to a future time).
+Binary smoke on a temp copy: `/_v` `…150491…` → after editing BACKLOG →
+`…151152…` (changed: YES); poll script present. Fresh-context review: **PASS**,
+**zero findings** — `-race` clean, 40 concurrent `/_v` consistent, XSS probe on
+the baked version (JS-context escaping holds), non-parsed-file edits ignored,
+empty instance → `0`.
+
+**What changed:** `internal/backlog/{parse,render,server}.go`,
+`templates/layout.html`, new `version_test.go`. Delivery: **PR #13, merged
+`14b1df6`**.
+
+**What I learned:** `/_v` deliberately stats rather than reparsing — the poll
+path must stay cheap. String **inequality** (not strict-greater) as the reload
+trigger also catches an mtime rewind (git checkout). Sharing one `versionString`
+between the baked value and `/_v` guarantees they're the same computation, so
+equality reliably means "unchanged."
+
+**Next:** MVP complete — run the end-of-session sweep and stop.
+
+---
+## 2026-07-20 15:35 — v1 MVP complete (session wrap)
+
+**Task:** session summary
+**What I did:** Shipped all seven §15 slices, each as a feature PR + a fresh-
+context review + a close PR: TASK-001 CLI/server skeleton (#1), TASK-002 area
+resolution (#3), TASK-003 planning parser + dedup (#5), TASK-004 blockers +
+badges + `/_diag` (#7), TASK-005 board template + Tailwind (#9), TASK-006 task
+detail + 404 (#11), TASK-007 live reload (#13). 13 feature/close PR pairs total,
+all squash-merged; `main` is the only branch.
+
+**What I verified:** Every task passed all its acceptance criteria and an
+independent fresh-context review (all PASS; findings fixed or rebutted in-PR).
+End-to-end **dogfood**: `bklg .` serves this repo's own board (7 cards across
+Backlog/In-Progress/Done, `/_diag` = "no warnings" — the real instance is
+clean), and every route works (`/`, `/{id}`, `/_v`, `/_diag`, 404s). Zero Go
+module deps; stdlib only. Full end-of-session sweep quoted below the DONE entries.
+
+**What I learned:** The close-PR-per-task rhythm is heavy (14 PRs for 7 tasks)
+but keeps `main` always-green and every change reviewed; the close mechanics
+became a script (`scratchpad/close-task.sh`) after the 3rd repetition. The tool
+viewing its own build instance (dogfooding) caught nothing broken but is a
+genuinely useful confidence check.
+
+**Next:** Session envelope spent (MVP shipped). Stop. Future work: promote a
+parking-lot item (spec §13) in a new session — GitHub Actions CI would be a good
+first one (it makes delivery gate D3 real).
