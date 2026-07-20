@@ -23,24 +23,31 @@ func TestDiagRoute(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("status %d", rec.Code)
 	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("/_diag Content-Type = %q, want text/html", ct)
+	}
 	body := rec.Body.String()
 
-	// AC5: exactly the three seeded reconciliation warnings, nothing unexpected.
-	lines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(lines) != 3 {
-		t.Errorf("/_diag has %d lines, want exactly 3:\n%s", len(lines), body)
-	}
+	// AC2: grouped by kind with titles + explanations.
 	for _, sub := range []string{
-		"CURRENT holds >1 active task",
-		"DONE item not ticked in BACKLOG: DEMO-6",
-		"shipped item missing from DONE.md: DEMO-5",
+		"More than one active task",         // current-multiple group title
+		"Shipped, but not in DONE.md",       // shipped-missing-done group title
+		"In DONE.md, not ticked in BACKLOG", // done-not-ticked group title
+		"CURRENT holds &gt;1 active task",   // current-multiple message (no id), > escaped
 	} {
 		if !strings.Contains(body, sub) {
 			t.Errorf("/_diag missing %q", sub)
 		}
 	}
-	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
-		t.Errorf("/_diag Content-Type = %q, want text/plain", ct)
+	// AC3: id-bearing warnings link to their detail page.
+	for _, id := range []string{"DEMO-5", "DEMO-6"} {
+		if !strings.Contains(body, `href="/`+id+`"`) {
+			t.Errorf("/_diag missing actionable link to /%s", id)
+		}
+	}
+	// AC4: the shipped-missing explanation reframes it as informational.
+	if !strings.Contains(body, "keeps the full record inline") {
+		t.Error("/_diag missing the 'inline record is expected' explanation")
 	}
 }
 

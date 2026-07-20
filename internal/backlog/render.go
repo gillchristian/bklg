@@ -50,6 +50,9 @@ var (
 	taskTmpl = template.Must(
 		template.New("task").Funcs(funcs).ParseFS(templatesFS, "templates/layout.html", "templates/task.html"),
 	)
+	diagTmpl = template.Must(
+		template.New("diag").Funcs(funcs).ParseFS(templatesFS, "templates/layout.html", "templates/diag.html"),
+	)
 )
 
 // versionString renders a freshness stamp for /_v and the poll script: the max
@@ -66,7 +69,7 @@ func versionString(t time.Time) string {
 // header/banner inputs and the live-reload version.
 type boardVM struct {
 	PlanningDir string
-	Warnings    []string
+	Warnings    []Warning
 	Version     string
 	Columns     []columnVM
 }
@@ -81,7 +84,7 @@ type columnVM struct {
 // blockers referencing it (open first, then resolved).
 type taskVM struct {
 	PlanningDir string
-	Warnings    []string
+	Warnings    []Warning
 	Version     string
 	Card        Card
 	Blockers    []Blocker
@@ -104,6 +107,60 @@ func viewModel(b Board) boardVM {
 		Warnings:    b.Warnings,
 		Version:     versionString(b.Meta.LatestMTime),
 		Columns:     cols,
+	}
+}
+
+// --- /_diag view model ------------------------------------------------------
+
+type diagGroup struct {
+	Kind        string
+	Title       string
+	Explanation string
+	Warnings    []Warning
+}
+
+type diagVM struct {
+	PlanningDir string
+	Version     string
+	Warnings    []Warning // for the shared layout banner (count)
+	Groups      []diagGroup
+}
+
+// diagKindOrder fixes the display order of known warning kinds (most
+// invariant-violating first); explanations say what each means and what to do.
+var diagKindOrder = []string{"current-multiple", "shipped-missing-done", "done-not-ticked", "malformed-done", "read-error"}
+
+var diagExplain = map[string][2]string{
+	"current-multiple":     {"More than one active task", "CURRENT holds more than one task under ## Active. The framework's one-task-at-a-time invariant expects exactly one — finish or move the extras."},
+	"shipped-missing-done": {"Shipped, but not in DONE.md", "Checked [x] in BACKLOG but with no DONE.md entry. Add a DONE entry — or, if this instance keeps the full record inline on the [x] line, this is expected and purely informational."},
+	"done-not-ticked":      {"In DONE.md, not ticked in BACKLOG", "A DONE.md entry whose id isn't checked [x] in BACKLOG. Tick it so the backlog stays an accurate shipping index."},
+	"malformed-done":       {"Malformed DONE entry", "A DONE.md entry didn't match either supported shape; it was parsed best-effort."},
+	"read-error":           {"Couldn't read a file", "A planning/progress file couldn't be read; the board renders best-effort without it."},
+}
+
+func buildDiagVM(b Board) diagVM {
+	byKind := map[string][]Warning{}
+	for _, w := range b.Warnings {
+		byKind[w.Kind] = append(byKind[w.Kind], w)
+	}
+	var groups []diagGroup
+	seen := map[string]bool{}
+	for _, k := range diagKindOrder {
+		if ws := byKind[k]; len(ws) > 0 {
+			groups = append(groups, diagGroup{Kind: k, Title: diagExplain[k][0], Explanation: diagExplain[k][1], Warnings: ws})
+			seen[k] = true
+		}
+	}
+	for k, ws := range byKind { // any unknown kinds, future-proof
+		if !seen[k] {
+			groups = append(groups, diagGroup{Kind: k, Title: k, Warnings: ws})
+		}
+	}
+	return diagVM{
+		PlanningDir: DisplayPath(b.Meta.PlanningDir),
+		Version:     versionString(b.Meta.LatestMTime),
+		Warnings:    b.Warnings,
+		Groups:      groups,
 	}
 }
 

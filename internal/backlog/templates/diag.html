@@ -1,0 +1,22 @@
+{{define "content"}}
+<a href="/" class="text-sm text-blue-700 hover:underline">← board</a>
+<h1 class="text-lg font-semibold mt-3">Diagnostics</h1>
+{{if .Groups}}
+<p class="text-sm text-gray-500 mb-4">{{len .Warnings}} warning{{if ne (len .Warnings) 1}}s{{end}} across {{len .Groups}} categor{{if eq (len .Groups) 1}}y{{else}}ies{{end}}.</p>
+{{range .Groups}}
+<section class="mb-4 bg-white rounded-lg border border-gray-200 p-3">
+  <h2 class="text-sm font-semibold text-gray-800">{{.Title}} <span class="text-gray-400 font-normal">({{len .Warnings}})</span></h2>
+  <p class="text-sm text-gray-500 mt-0.5">{{.Explanation}}</p>
+  <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+    {{range .Warnings}}
+    <li class="text-sm">
+      {{if .TaskRaw}}<a class="font-mono text-xs text-blue-700 hover:underline" href="/{{.TaskRaw}}">{{.TaskRaw}}</a>{{else}}<span class="text-gray-700">{{.Message}}</span>{{end}}
+    </li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+{{else}}
+<p class="text-sm text-gray-500 mt-3">No warnings — the board parsed cleanly. ✓</p>
+{{end}}
+{{end}}
