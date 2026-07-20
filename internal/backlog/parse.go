@@ -23,9 +23,10 @@ type lineParser struct{}
 const emDash = " — " // U+2014 with surrounding spaces — the field separator (spec §2)
 
 var (
-	idRe       = regexp.MustCompile(`^([A-Z]+)-(\d+)`)
-	checkboxRe = regexp.MustCompile(`^-\s+\[([ xX])\]\s+(.*)$`)
-	bulletRe   = regexp.MustCompile(`^-\s+(.*)$`)
+	idRe          = regexp.MustCompile(`^([A-Z]+)-(\d+)`)
+	checkboxRe    = regexp.MustCompile(`^-\s+\[([ xX])\]\s+(.*)$`)
+	bulletRe      = regexp.MustCompile(`^-\s+(.*)$`)
+	blockerHeadRe = regexp.MustCompile(`^BLOCKER-\d+`)
 )
 
 func (lineParser) Parse(a Areas) (Board, error) {
@@ -41,10 +42,11 @@ func (lineParser) Parse(a Areas) (Board, error) {
 	b.Warnings = append(b.Warnings, doneWarns...)
 
 	cards, recWarns := reconcile(current, backlog, done)
-	b.Cards = cards
 	b.Warnings = append(b.Warnings, recWarns...)
 
-	// Blockers + badge join land in TASK-004; progress area is read there.
+	b.Blockers = parseBlockers(readArea(a.ProgressDir, "blockers.md", &b.Warnings))
+	computeBadges(cards, b.Blockers)
+	b.Cards = cards
 	return b, nil
 }
 
@@ -389,4 +391,97 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 		cards = append(cards, Card{ID: b.ID, Title: b.Title, Column: ColBacklog, ParkingLot: true, Raw: b.Raw})
 	}
 	return cards, warns
+}
+
+// --- blockers (spec §2) -----------------------------------------------------
+
+// parseBlockers reads blockers.md. Blocker headings and section headings are
+// both "## ": a heading matching ^BLOCKER-\d+ is a blocker, assigned to the last
+// section seen; Format/Open/Resolved are sections; everything under "## Format"
+// is skipped. Open = the blocker sits under "## Open".
+func parseBlockers(md string) []Blocker {
+	var blockers []Blocker
+	var cur *Blocker
+	section := ""
+	flush := func() {
+		if cur != nil {
+			cur.Body = strings.TrimSpace(cur.Body)
+			blockers = append(blockers, *cur)
+			cur = nil
+		}
+	}
+	for _, line := range strings.Split(md, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			head := strings.TrimSpace(line[len("## "):])
+			flush()
+			if blockerHeadRe.MatchString(head) {
+				if section != "Format" { // skip the Format example
+					cur = parseBlockerHead(head, section)
+				}
+			} else {
+				section = head
+			}
+			continue
+		}
+		if cur == nil {
+			continue
+		}
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "**Task affected:**") {
+			cur.TaskRaw = strings.TrimSpace(strings.TrimPrefix(t, "**Task affected:**"))
+		} else {
+			cur.Body += line + "\n"
+		}
+	}
+	flush()
+	return blockers
+}
+
+func parseBlockerHead(head, section string) *Blocker {
+	b := &Blocker{Open: section == "Open"}
+	if id := parseID(head); id != nil {
+		b.ID = *id
+	}
+	parts := strings.Split(head, emDash)
+	if len(parts) >= 2 {
+		b.Title = strings.TrimSpace(parts[1])
+	}
+	if len(parts) >= 3 {
+		b.Opened = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(parts[2]), "opened "))
+	}
+	return b
+}
+
+// --- badges (spec §6) -------------------------------------------------------
+
+// computeBadges attaches the cross-cutting chips by joining planning + progress.
+// blocked is the load-bearing join (an open blocker's affected task); the rest
+// are planning-only. Order: blocked, parking, override, no-ac, then namespace.
+func computeBadges(cards []Card, blockers []Blocker) {
+	blocked := map[string]bool{}
+	for _, bl := range blockers {
+		if bl.Open && bl.TaskRaw != "" {
+			blocked[strings.ToUpper(strings.TrimSpace(bl.TaskRaw))] = true
+		}
+	}
+	for i := range cards {
+		c := &cards[i]
+		var badges []Badge
+		if c.ID != nil && blocked[strings.ToUpper(c.ID.Raw)] {
+			badges = append(badges, Badge{Kind: "blocked"})
+		}
+		if c.ParkingLot {
+			badges = append(badges, Badge{Kind: "parking"})
+		}
+		if c.DeliveryOverride != "" {
+			badges = append(badges, Badge{Kind: "override"})
+		}
+		if c.Column == ColInProgress && len(c.Acceptance) == 0 {
+			badges = append(badges, Badge{Kind: "no-ac"})
+		}
+		if c.ID != nil {
+			badges = append(badges, Badge{Kind: "namespace", Label: c.ID.Namespace})
+		}
+		c.Badges = badges
+	}
 }
