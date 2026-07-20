@@ -447,3 +447,35 @@ Delivery: **PR #18, merged `d0e33a5`**.
 
 **Next:** TASK-010 — safe inline markdown (escape-first, stdlib-only, ADR-0002);
 the one place `template.HTML` is used → paranoid security review. AC in `CURRENT.md`.
+
+---
+## 2026-07-20 17:11 — TASK-010 safe inline markdown
+
+**Task:** TASK-010
+**What I did:** `markdown.go` `renderMarkdown` — escape-first, then whitelist
+inline patterns (`**`/`*`/`` ` ``/links) → `template.HTML`; `safeURL` scheme-check
+(rejects javascript/data/protocol-relative/backslash); code spans placeheld;
+NUL stripped; asterisk-only emphasis. Registered `md`; templates render free-text
+fields via `{{md}}`, Raw block stays auto-escaped. ADR-0002 (keep zero-dep vs
+goldmark+sanitizer).
+
+**What I verified:** Local CI green + `-race`. 7 markdown tests (render, escape-
+first, unsafe-link, code-protected, unclosed, no-underscore, safeURL, NUL). Real
+trail: `/TRACK-000` renders `<strong>`/6×`<code>`; board 0 live `<script>`.
+**Adversarial security review: PASS, no injection** (~90 hostile inputs, `"`-break
+attempt, placeholder spoof, structural fuzzing). Its two non-XSS notes hardened
+(reject `//`/backslash links; strip NUL).
+
+**What I learned:** Escape-first + tag-whitelist + href-scheme-check is safe
+*without* a sanitizer precisely because repo HTML never reaches output — the
+sanitizer's job never arises. That's the whole justification for staying
+zero-dep (ADR-0002). Underscore emphasis is a footgun on technical text
+(snake_case, dunders) → asterisk-only.
+
+**What changed:** `markdown.go`+`markdown_test.go` (new), `render.go` (funcs),
+`templates/{board,task}.html`, `decisions/0002-*.md`+INDEX. Delivery: **PR #20,
+merged `ff2ea83`**.
+
+**Next:** TASK-011 — make `/_diag` actionable: structured `[]Warning` grouped by
+kind, counts, explanations, id links; reframe "missing from DONE.md". AC in
+`CURRENT.md`.
