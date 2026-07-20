@@ -27,9 +27,9 @@ func (s *Server) board() Board {
 	return b
 }
 
-// Routes wires the mux. Literal segments beat the {id} wildcard, so /_v and
-// /_diag win over /{id} without ordering tricks (spec §7). /{$} matches exactly
-// "/". Board (/) and detail (/{id}) render in later slices.
+// Routes wires the mux. Literal segments beat the {id} wildcard, so /_diag
+// (and /_v, added in TASK-007) win over /{id} without ordering tricks (spec §7).
+// /{$} matches exactly "/".
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.handleBoard)
