@@ -1,6 +1,9 @@
 package backlog
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ID is a task identifier like {"MONO", 6, "MONO-006"}. Raw is the source text,
 // Namespace/Number the parsed halves. IDs match [A-Z]+-\d+ (spec §2/§4).
@@ -96,4 +99,16 @@ type Board struct {
 	Blockers []Blocker
 	Warnings []string // parse + reconciliation diagnostics -> /_diag
 	Meta     Meta
+}
+
+// CardByRawID returns the card whose id matches raw (case-insensitively, per the
+// D2 route-key decision). Parking/id-less cards have no id and never match, so
+// they have no detail page.
+func (b *Board) CardByRawID(raw string) (*Card, bool) {
+	for i := range b.Cards {
+		if b.Cards[i].ID != nil && strings.EqualFold(b.Cards[i].ID.Raw, raw) {
+			return &b.Cards[i], true
+		}
+	}
+	return nil, false
 }

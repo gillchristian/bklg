@@ -15,10 +15,15 @@ var funcs = template.FuncMap{
 	"badgeText":  badgeText,
 }
 
-// boardTmpl = layout + board content. A separate set per page (task.html gets
-// its own in TASK-006) so each can define "content" without colliding.
-var boardTmpl = template.Must(
-	template.New("board").Funcs(funcs).ParseFS(templatesFS, "templates/layout.html", "templates/board.html"),
+// One template set per page (each defines its own "content"), sharing the
+// layout — separate sets avoid a "content" redefinition collision.
+var (
+	boardTmpl = template.Must(
+		template.New("board").Funcs(funcs).ParseFS(templatesFS, "templates/layout.html", "templates/board.html"),
+	)
+	taskTmpl = template.Must(
+		template.New("task").Funcs(funcs).ParseFS(templatesFS, "templates/layout.html", "templates/task.html"),
+	)
 )
 
 // boardVM is the board's view model: the three columns in flow order, plus the
@@ -32,6 +37,16 @@ type boardVM struct {
 type columnVM struct {
 	Title string
 	Cards []Card
+}
+
+// taskVM is the detail page's view model. It carries the shared header inputs
+// (PlanningDir/Warnings, so the layout banner renders) plus the card and the
+// blockers referencing it (open first, then resolved).
+type taskVM struct {
+	PlanningDir string
+	Warnings    []string
+	Card        Card
+	Blockers    []Blocker
 }
 
 func viewModel(b Board) boardVM {
