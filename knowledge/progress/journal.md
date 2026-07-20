@@ -509,3 +509,38 @@ good reminder that auto-escaping applies to my own diagnostic strings too.
 **Next:** TASK-012 (final) — multi-system board: aggregate all `systems/*` at a
 root manifest + `?system=` filter + per-card system chip; ADR-0003. AC in
 `CURRENT.md`.
+
+---
+## 2026-07-20 17:52 — TASK-012 multi-system board
+
+**Task:** TASK-012
+**What I did:** Aggregate mode. `Card.System`; `NewMultiServer(root, systems)`;
+`Server.board()` resolves+parses each `systems/<name>`, tags System,
+concatenates; `main` builds it on `RootManifestError` (startup `aggregate: N
+systems`). Server-side `?system=` filter; filter bar lists **all** discovered
+systems (incl. empty, so any project is filterable); per-card system chip on
+board + detail; global `/{id}` lookup; `/_v` = max mtime across systems;
+unresolvable system → skip + warning. ADR-0003.
+
+**What I verified:** Local CI green (53→ now more tests). Controlled `testdata/
+mono` (alpha+beta) tests + `TestSingleModeIgnoresSystemFilter`. **Real trail**:
+`bklg /Users/bb8/dev/trail` → `aggregate: 5 systems — trail, cadence, gateway,
+track, reflect`, `/`=200 ~105 cards, chips, `?system=track`→15 no-leak, all 5 in
+the bar (cadence/reflect empty), `/TRACK-000`→200, `/_v` live. Fresh-context
+review PASS all 5 AC; fixed a [low] contract bug (single mode didn't ignore
+`?system=` → blanked the board; now zeroed when no systems).
+
+**What I learned:** cadence/reflect showed 0 cards not from a parse bug but
+because their only `### ` heading sits under `## Entry template` (correctly
+ignored) — verified the raw files before assuming a bug (the TASK-009 lesson,
+reapplied). Listing empty systems in the bar makes "filter to any project"
+literally true and matches the startup count.
+
+**What changed:** `model.go` (Card.System), `server.go` (multi-server +
+aggregate + Systems + latestMTime), `render.go` (viewModel filter + systemChip),
+`main.go` (root→aggregate), `templates/{board,task}.html`, `testdata/mono/*`,
+`multi_test.go`, `decisions/0003-*.md`+INDEX. Delivery: **PR #24, merged `95acdf7`**.
+
+**Next:** v2 batch (TASK-008…012) complete — CURRENT empty. End-of-session sweep,
+then stop. Future: parking-lot items + the v2 ADR follow-ups (block markdown,
+per-system detail routes, CI).
