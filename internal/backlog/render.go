@@ -18,6 +18,7 @@ var funcs = template.FuncMap{
 	"badgeClass": badgeClass,
 	"badgeText":  badgeText,
 	"truncate":   truncate,
+	"md":         renderMarkdown,
 }
 
 // truncate shortens a card title for the board so a long, paragraph-sized title
