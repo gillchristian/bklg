@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 )
@@ -35,11 +36,16 @@ func (s *Server) Routes() http.Handler {
 	return mux
 }
 
-// handleBoard is a placeholder until TASK-005 renders the three-column board.
+// handleBoard renders the three-column board. It renders into a buffer first so
+// a template error becomes a clean 500 instead of a half-written page.
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
-	b := s.board()
+	var buf bytes.Buffer
+	if err := boardTmpl.ExecuteTemplate(&buf, "layout", viewModel(s.board())); err != nil {
+		http.Error(w, "bklg: render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, boardPlaceholder, len(b.Cards), len(b.Warnings), len(b.Warnings))
+	buf.WriteTo(w)
 }
 
 // handleDiag lists the parse warnings verbatim, one per line (spec §7). Plain
@@ -55,14 +61,3 @@ func (s *Server) handleDiag(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, warn)
 	}
 }
-
-const boardPlaceholder = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>bklg</title></head>
-<body>
-<h1>bklg</h1>
-<p>Parsed %d cards, %d warnings. The board renders in TASK-005.</p>
-<p><a href="/_diag">/_diag</a> (%d warnings)</p>
-</body>
-</html>
-`
