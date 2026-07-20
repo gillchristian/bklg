@@ -308,9 +308,15 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 		}
 	}
 	backlogChecked := map[string]bool{}
+	currentByID := map[string]Card{}
 	for _, b := range backlog {
-		if b.Checked && b.ID != nil {
+		if b.Checked && b.ID != nil && !b.Parking { // parking rows aren't "shipped"
 			backlogChecked[b.ID.Raw] = true
+		}
+	}
+	for _, c := range current {
+		if c.ID != nil {
+			currentByID[c.ID.Raw] = c
 		}
 	}
 
@@ -328,14 +334,19 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 		}
 		cards = append(cards, d)
 	}
-	// A [x] backlog item with no DONE entry is still shown in Done, with a warning.
+	// A [x] backlog item with no DONE entry is still shown in Done, with a warning
+	// (once per id, even if the backlog lists it twice). If that id is also the
+	// CURRENT task, promote that card so its detail survives, rather than a stub.
 	for _, b := range backlog {
-		if b.Parking || !b.Checked || b.ID == nil || doneIDs[b.ID.Raw] {
+		if b.Parking || !b.Checked || b.ID == nil || doneIDs[b.ID.Raw] || seen[b.ID.Raw] {
 			continue
 		}
+		seen[b.ID.Raw] = true
 		warns = append(warns, "shipped item missing from DONE.md: "+b.ID.Raw)
-		if !seen[b.ID.Raw] {
-			seen[b.ID.Raw] = true
+		if cc, ok := currentByID[b.ID.Raw]; ok {
+			cc.Column = ColDone
+			cards = append(cards, cc)
+		} else {
 			cards = append(cards, Card{ID: b.ID, Title: b.Title, Column: ColDone, Raw: b.Raw})
 		}
 	}
@@ -362,10 +373,18 @@ func reconcile(current []Card, backlog []backlogItem, done []Card) ([]Card, []st
 		}
 		cards = append(cards, Card{ID: b.ID, Title: b.Title, Column: ColBacklog, Raw: b.Raw})
 	}
-	// Parking-lot items: Backlog column, muted; never deduped (no id).
+	// Parking-lot items: Backlog column, muted. An id-less parking item is always
+	// its own card; one whose id already appears as a tracked card is deduped away
+	// so the "one card per id" invariant holds.
 	for _, b := range backlog {
 		if !b.Parking {
 			continue
+		}
+		if b.ID != nil {
+			if seen[b.ID.Raw] {
+				continue
+			}
+			seen[b.ID.Raw] = true
 		}
 		cards = append(cards, Card{ID: b.ID, Title: b.Title, Column: ColBacklog, ParkingLot: true, Raw: b.Raw})
 	}

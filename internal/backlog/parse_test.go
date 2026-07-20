@@ -225,3 +225,80 @@ func TestParseDefensive(t *testing.T) {
 		t.Errorf("expected read warnings for a missing planning area")
 	}
 }
+
+// A parking-lot item whose id already appears as a tracked card must not create
+// a second card (one card per id).
+func TestReconcileParkingWithIDDedups(t *testing.T) {
+	id := &ID{Namespace: "DEMO", Number: 1, Raw: "DEMO-1"}
+	current := []Card{{ID: id, Title: "active", Column: ColInProgress}}
+	backlog := []backlogItem{
+		{ID: id, Title: "active"},
+		{ID: id, Title: "parked dup", Parking: true},
+	}
+	cards, _ := reconcile(current, backlog, nil)
+	n := 0
+	for _, c := range cards {
+		if c.ID != nil && c.ID.Raw == "DEMO-1" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("DEMO-1 appears %d times, want 1 (parking-with-id must dedup)", n)
+	}
+}
+
+// An id in CURRENT that is also [x] in BACKLOG with no DONE entry lands in Done
+// but keeps its CURRENT detail (and warns exactly once).
+func TestReconcileShippedInCurrentKeepsDetail(t *testing.T) {
+	id := &ID{Namespace: "DEMO", Number: 2, Raw: "DEMO-2"}
+	current := []Card{{
+		ID: id, Title: "wip", Column: ColInProgress,
+		Acceptance: []Criterion{{Text: "c1", Checked: true}},
+		Source:     "user request",
+	}}
+	backlog := []backlogItem{{ID: id, Title: "wip", Checked: true}}
+	cards, warns := reconcile(current, backlog, nil)
+	var got *Card
+	for i := range cards {
+		if cards[i].ID != nil && cards[i].ID.Raw == "DEMO-2" {
+			got = &cards[i]
+		}
+	}
+	if got == nil {
+		t.Fatal("DEMO-2 missing")
+	}
+	if got.Column != ColDone {
+		t.Errorf("column=%v, want Done", got.Column)
+	}
+	if len(got.Acceptance) != 1 || got.Source != "user request" {
+		t.Errorf("CURRENT detail lost: acc=%d source=%q", len(got.Acceptance), got.Source)
+	}
+	shipped := 0
+	for _, w := range warns {
+		if strings.Contains(w, "shipped item missing from DONE.md") {
+			shipped++
+		}
+	}
+	if shipped != 1 {
+		t.Errorf("shipped-missing warnings=%d, want 1", shipped)
+	}
+}
+
+// Duplicate [x] backlog rows for one id warn once, not per row.
+func TestReconcileNoDuplicateWarnings(t *testing.T) {
+	id := &ID{Namespace: "DEMO", Number: 9, Raw: "DEMO-9"}
+	backlog := []backlogItem{
+		{ID: id, Title: "x", Checked: true},
+		{ID: id, Title: "x", Checked: true},
+	}
+	_, warns := reconcile(nil, backlog, nil)
+	shipped := 0
+	for _, w := range warns {
+		if strings.Contains(w, "shipped item missing from DONE.md: DEMO-9") {
+			shipped++
+		}
+	}
+	if shipped != 1 {
+		t.Errorf("duplicate [x] rows produced %d warnings, want 1", shipped)
+	}
+}
