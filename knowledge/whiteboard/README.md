@@ -9,4 +9,6 @@ and update the Status line; keep the entry (the recorded thinking is the value).
 
 ## Index of current entries
 
-_(none yet)_
+- [trail-instance-findings.md](trail-instance-findings.md) — open — what
+  running bklg against the real `trail` monorepo surfaced; grounds the v2
+  feedback tasks TASK-008…012.
