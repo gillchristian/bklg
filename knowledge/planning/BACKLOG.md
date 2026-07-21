@@ -37,6 +37,27 @@ feature last. AC written when each is promoted to `CURRENT.md`.
 - [x] TASK-011 — Make `/_diag` actionable — structured `[]Warning{Kind,Message,TaskRaw}`; `/_diag` is an HTML page grouping warnings by kind with counts, explanations, and links to task detail pages; "missing from DONE.md" reframed as informational. (Feedback: "what's the purpose of /_diag?") — **PR #22, merged `ce95127`**
 - [x] TASK-012 — Multi-system board (aggregate + filter) — at a monorepo **root** manifest, aggregate every `systems/<name>` instance into one board with a per-card **system chip** and a server-side `?system=` filter bar (lists every system); global detail lookup; `/_v` across systems; unresolvable systems skipped with a warning. Replaces v1's error. ADR-0003. On real trail: 5 systems, ~105 cards. (Feedback #1 + spec §13.1.) — **PR #24, merged `95acdf7`**
 
+### v3 — dashboard adapter (Pinata-shape KBs) (2026-07-21)
+
+Grounded in this session's investigation of the real Pinata KB
+(`~/dev/Pinata-dev/Pinata/knowledge`): it runs a full Active/Backlog/Done
+lifecycle but in a shape the framework parser can't read — one file
+(`work/index.md`), Active/Done as pipe **tables**, Backlog as bullet groups
+under bold subheads, identity via inline Linear ids (`PINATA-\d+`, 0..N per row)
+not one structured id per card, and "blocked" as prose (`⛔`). This batch
+teaches bklg a second input convention (a "dashboard adapter") reading that
+shape; it pairs with a light dashboard-format contract the target KB follows
+([`../reference/specs/dashboard-format.md`](../reference/specs/dashboard-format.md)).
+Two-sided by design: the parser is defensive, but a useful board needs the input
+to stay regular. ADR-0004 records the second-convention decision (status
+**proposed** — flip to accepted when TASK-013 is promoted). AC written when each
+is promoted to `CURRENT.md`.
+
+- [ ] TASK-013 — Dashboard-mode resolution — `Resolve` tries `README.md` then `index.md` as the manifest; a new `dashboard:` Locations key (single file, repo-root-relative) plus a `--dashboard <file>` escape-hatch flag select dashboard mode; in that mode the `planning/` dir requirement is lifted and the target is the one dashboard file. Framework mode unchanged. (ADR-0004.)
+- [ ] TASK-014 — Dashboard parser → model — parse `## Active`/`## Done` pipe tables (split on unescaped `|`; `\|` literal) + `## Backlog` bullet groups (a `**Group:**` subhead sets the group label) into `[]Card`: title = leading `**bold**` (short/subtitle split on ` — `, U+2014), column from section, every inline `[A-Z]+-\d+` → `Card.Tickets` (0..N; `#\d+` PR refs ignored), Material link captured; defensive → warnings, never panics. Ships `testdata/dashboard/` mirroring the Pinata shapes. `Card` grows an optional multi-ticket slice + a dashboard flag.
+- [ ] TASK-015 — Dashboard badges + board render — `blocked` from a **leading** `⛔`/`**Blocked**` status marker (there is no `blockers.md` in this mode); Linear ticket chips with a configurable base (`linear:` Locations key / `--linear-base`, default `https://linear.app/gopinata/issue/`); Backlog group chip; board template tolerates AC-less, multi-ticket cards.
+- [ ] TASK-016 — Dashboard detail + links out — `/{slug}` (title-slugged, collisions disambiguated) → detail page: title, column, linked tickets, Material link, and the raw row block; unknown slug → 404.
+
 ## Parking lot
 
 _(deferred — the spec's §13 non-goals, v2+, out of the MVP envelope. Multi-system
@@ -47,3 +68,5 @@ board and markdown rendering were promoted to Active as TASK-012 and TASK-010.)_
 - JSON API (`/api/board.json`) for external consumers. (Spec §13.5.)
 - Live push — swap the mtime poll for SSE/`fsnotify` if the poll feels laggy. (Spec §13.6.)
 - GitHub Actions CI — build/vet/test on push; would make delivery gate D3 (remote check) meaningful. (Not in the spec; would let the framework's remote-check gate bite.)
+- Dashboard auto-detect — infer dashboard mode when a KB has no `planning/` but a `work/index.md`, dropping the explicit `dashboard:` Locations key. (Deferred from ADR-0004: explicit config is safer for v1.)
+- Linear status sync — cross-check dashboard Active rows against live Linear status on read (mirrors the Pinata KB's own sync-on-read habit). Needs network + auth; likely stays a non-goal for a zero-dep localhost tool.

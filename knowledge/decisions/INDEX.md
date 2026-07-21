@@ -30,3 +30,9 @@ should be able to understand later without asking.
   aggregates all `systems/<name>` into one board with per-card system chips and
   a server-side `?system=` filter (lists every system); global detail lookup;
   unresolvable systems skipped with a warning. **accepted**, 2026-07-20.
+- [0004](0004-dashboard-adapter.md) — Dashboard adapter: a second, opt-in input
+  convention (a `dashboard:` Locations key / `--dashboard` flag selects it) for
+  single-file Active/Backlog/Done dashboards that identify work by inline Linear
+  ids (0..N per card) rather than one id per card — for Pinata-shape KBs; pairs
+  with the [`../reference/specs/dashboard-format.md`](../reference/specs/dashboard-format.md)
+  contract. Built as backlog v3 (TASK-013…016). **proposed**, 2026-07-21.
