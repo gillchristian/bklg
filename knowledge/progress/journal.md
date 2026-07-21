@@ -587,3 +587,47 @@ proposes un-greenlit work).
 **Next:** user greenlights (or edits) Path B; on go-ahead, promote TASK-013 to
 `CURRENT.md` with AC and flip ADR-0004 to accepted. The Pinata KB update is
 handed off separately via `pinata.md`.
+
+---
+## 2026-07-21 15:20 — TASK-013 dashboard-mode resolution
+
+**Task:** TASK-013 (BACKLOG v3, ADR-0004). User greenlit Path B.
+
+**What I did:** Added dashboard-mode resolution — the first slice of the
+dashboard adapter. `Resolve` manifest lookup now tries `README.md` then
+`index.md` (first hit wins); a `dashboard:` key in the `## Locations` block, or a
+new `--dashboard FILE` flag, selects the single-file adapter and short-circuits
+the planning/progress + systems resolution. Dashboard paths resolve against the
+repo root (`path`), like every other Locations value. `Areas` gained
+`DashboardFile`; `NewParser()` is now a `defaultParser` that dispatches on it —
+`parseDashboard` returns an empty board for this slice (real parsing is
+TASK-014). `areaMTime` watches the single file in dashboard mode so `/_v` stays
+live. `main` grew the `dashboardServer` helper + the flag in `splitArgs`
+`takesValue`. Flipped ADR-0004 proposed→accepted.
+
+**What I verified:** Local CI green (build/vet/gofmt/test). Smoke (all quoted in
+the PR): missing file → `bklg: no dashboard file at nope.md` exit 1; `bklg .`
+framework startup line unchanged, `/`→200; `--dashboard knowledge/work/index.md
+~/dev/Pinata-dev/Pinata` → startup `dashboard: …/work/index.md`, `/`→200; the
+Locations-key fixture via `main` → `/`→200 and `/_v` a real (non-zero) mtime.
+Unit tests: both resolution paths + missing-file (flag AND Locations key) +
+non-dir + framework-unaffected. Fresh-context review (diff+AC only): PASS all 5
+AC, zero correctness findings; its coverage nit (missing-file via Locations)
+fixed with a test + `dashboard-missing` fixture, its other two nits acknowledged
+(`Meta.PlanningDir` reuse → TASK-014; manifest widening → intended per ADR-0004).
+
+**What I learned:** The fixture's `dashboard:` value deliberately includes the
+`knowledge/` prefix (`knowledge/work/index.md`), so it only resolves correctly
+under repo-root joining — the fixture genuinely proves the repo-root-relative
+rule rather than accidentally passing under a base-relative join.
+
+**What changed:** `resolve.go` (manifest loop, `dashboard:` branch,
+`ResolveDashboard`/`dashboardAreas`, `parseLocations` key), `parse.go`
+(`defaultParser` dispatch, `parseDashboard` stub, dashboard-aware `areaMTime`),
+`main.go` (`--dashboard` flag, mode switch, `dashboardServer`),
+`resolve_test.go` + `testdata/resolve/dashboard{,-missing}`, planning/ADR docs.
+Delivery: **PR #27, merged `6cea51f`**. D3 remote check vacuous (no CI).
+
+**Next:** TASK-014 — dashboard parser → model (Active/Done tables + Backlog
+bullet groups → `[]Card` with Tickets/Group/Material; escaped-pipe handling;
+defensive warnings). AC in `CURRENT.md`.

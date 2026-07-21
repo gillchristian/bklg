@@ -14,12 +14,13 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-013 — Dashboard-mode resolution
+### TASK-014 — Dashboard parser → model
 **Source:** BACKLOG v3 (dashboard adapter; ADR-0004)
 **Acceptance criteria:**
-- [ ] Manifest lookup tries `README.md` then `index.md`: a KB whose only manifest is `index.md` carrying a `## Locations` `dashboard:` key resolves to dashboard mode. *(decider: unit test — `Resolve` on a `testdata` dashboard KB returns `Areas.DashboardFile` = the resolved file, no error though there is no `planning/`; `go test ./...` green.)*
-- [ ] A `dashboard: <path>` Locations key sets `Areas.DashboardFile = <path>/<value>` and lifts the planning-dir requirement. *(decider: same unit test asserts the exact path.)*
-- [ ] `--dashboard <file>` flag forces dashboard mode with no Locations block, resolving `<file>` against `[path]`. *(decider: unit test for the resolve helper + smoke — `bklg --dashboard knowledge/work/index.md ~/dev/Pinata-dev/Pinata` prints a `dashboard: …/work/index.md` startup line and `curl /` → 200.)*
-- [ ] A missing dashboard file exits non-zero with a clear message. *(decider: smoke — `bklg --dashboard nope.md .`; exit 1, stderr contains `no dashboard file`.)*
-- [ ] Framework mode unchanged. *(decider: the existing `resolve_test.go` cases still pass; smoke — `bklg .` on this repo prints the same `knowledge/planning/progress` line as before.)*
-**Notes:** Resolution slice only (mirrors TASK-002). The dashboard *parser* is TASK-014 — in this slice the parser dispatches on `Areas.DashboardFile` and returns an empty board, so dashboard mode starts and serves 200 with empty columns (parsing pending). Flips ADR-0004 to accepted (its own condition: "when TASK-013 is promoted"). Linear base URL default `https://linear.app/gopinata/issue/` confirmed by user 2026-07-21.
+- [ ] `## Active` / `## Done` pipe tables parse into `[]Card`: on the `testdata/dashboard` fixture, per-column card counts and each card's `{title, column, tickets, group, blocked, material}` match an expected table quoted in the journal. *(decider: unit test `TestParseDashboard`; `go test ./...` green.)*
+- [ ] A literal `\|` inside a cell is not a column split: a row whose status contains `a \|\| b` keeps that text intact in the card. *(decider: unit test asserts the card's text contains `||`.)*
+- [ ] `## Backlog` bullet groups: a `**Group:**` subhead sets `Card.Group` on the bullets under it; ungrouped bullets have empty Group. *(decider: unit test on the fixture.)*
+- [ ] Title = leading `**bold**` (subtitle after ` — `, U+2014); every inline `[A-Z]+-\d+` → `Card.Tickets` (0..N), `#\d+` PR refs ignored; the Material/Record link is captured. *(decider: unit test asserting tickets slice + material for a multi-ticket row and a zero-ticket row.)*
+- [ ] Defensive: a malformed row (no bold title / stray unescaped pipe) becomes a `/_diag` warning and is skipped; the rest of the board still renders; never panics. *(decider: unit test with a seeded bad row asserts a warning + a non-empty board; `go test -race`.)*
+- [ ] End-to-end: `bklg --dashboard knowledge/work/index.md ~/dev/Pinata-dev/Pinata` now shows populated columns (card counts > 0 in Active/Backlog/Done). *(decider: smoke — `curl /` card-count grep quoted in the journal.)*
+**Notes:** `Card` grows `Tickets []ID`, `Group string`, `Material string`, and a `Dashboard bool` (or reuse an existing flag) — kept optional so framework-mode cards are unaffected. Ticket chips + blocked badge + group chip + Linear links are TASK-015 (rendering); this slice is parse→model only, asserted by unit tests. Ship the rich `testdata/dashboard/` fixture (table Active/Done, bullet-group Backlog, an escaped-pipe row, a leading-`⛔` row, a multi-ticket row, a zero-ticket row, a malformed row).
