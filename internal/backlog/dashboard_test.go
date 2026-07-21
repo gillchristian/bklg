@@ -193,6 +193,46 @@ func TestDashboardBoardRender(t *testing.T) {
 	}
 }
 
+// TestDashboardBadges asserts the positive AND negative of the badge rules:
+// blocked cards get the badge, non-blocked ones don't, and dashboard cards
+// never get the framework-only no-ac badge.
+func TestDashboardBadges(t *testing.T) {
+	b, err := NewParser().Parse(Areas{KnowledgeDir: "testdata/dashboard", DashboardFile: "testdata/dashboard/work.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := func(title string) []string {
+		for _, c := range b.Cards {
+			if c.Title == title {
+				var k []string
+				for _, bd := range c.Badges {
+					k = append(k, bd.Kind)
+				}
+				return k
+			}
+		}
+		t.Fatalf("no card %q", title)
+		return nil
+	}
+	has := func(ks []string, want string) bool {
+		for _, k := range ks {
+			if k == want {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(kinds("Alpha task"), "blocked") {
+		t.Error("Alpha (leading ⛔) should have a blocked badge")
+	}
+	if has(kinds("Beta task (PINATA-200)"), "blocked") {
+		t.Error("Beta (not blocked) must not have a blocked badge")
+	}
+	if has(kinds("Alpha task"), "no-ac") {
+		t.Error("dashboard cards must never get the framework no-ac badge")
+	}
+}
+
 func hasWarnKind(ws []Warning, kind string) bool {
 	for _, w := range ws {
 		if w.Kind == kind {
