@@ -544,3 +544,46 @@ aggregate + Systems + latestMTime), `render.go` (viewModel filter + systemChip),
 **Next:** v2 batch (TASK-008…012) complete — CURRENT empty. End-of-session sweep,
 then stop. Future: parking-lot items + the v2 ADR follow-ups (block markdown,
 per-system detail routes, CI).
+
+---
+## 2026-07-21 12:31 — Plan the dashboard adapter (Path B) for Pinata-shape KBs
+
+**Task:** none — planning/grooming (no code). Prompted by a user report that
+`bklg .` in `~/dev/Pinata-dev/Pinata` exits `no planning area at
+knowledge/planning`.
+
+**What I did:** Investigated the real Pinata KB. Diagnosis: it's neither
+"shifted slightly" nor "no planning" — it runs a full Active/Backlog/Done
+lifecycle in a *different, incompatible shape*: manifest is `index.md` (not
+`README.md`) with no `## Locations` block; no `planning/`/`progress/` dirs; the
+whole board is one file, `work/index.md`, with Active/Done as pipe **tables**,
+Backlog as bullet groups under bold subheads, identity via inline Linear ids
+(`PINATA-\d+`, 0..N per row) not one structured id per card, and "blocked" as
+prose (`⛔`); Linear is the source of truth for status. So the mismatch is at
+the **data-model** level, not just paths. Laid out two paths — A: conform the KB
+to the skeleton (rejected: hand-maintained duplicate of `work/index.md` +
+Linear); B: teach bklg a second "dashboard adapter" convention. Drafted Path B
+as backlog **v3 (TASK-013…016)**, wrote **ADR-0004** (status *proposed*), a
+canonical contract at `reference/specs/dashboard-format.md`, and a standalone
+handoff copy at repo-root `pinata.md` for the Pinata coding agent.
+
+**What I verified:** Local CI green (`go build`/`vet`/`gofmt -l`/`go test`) — no
+Go changed, but confirmed the docs branch doesn't break the build. This is
+docs-only; no runtime behaviour to smoke-test yet (the adapter is unbuilt).
+
+**What I learned:** bklg's "the patterns are the contract" (§2) makes Path B
+inherently two-sided — a defensive parser over irregular input yields a `/_diag`
+dump, so the adapter must pair with a format contract the target KB follows.
+Two deliberate calls (in ADR-0004): mode is an explicit `dashboard:` config key
+(no auto-detect in v1), and blocked is a **leading** `⛔` only (Pinata already
+uses `⛔` mid-prose as a decision marker, so "contains" would false-positive).
+
+**What changed:** `planning/BACKLOG.md` (v3 batch + 2 parking-lot follow-ups),
+`decisions/0004-dashboard-adapter.md` + INDEX, `reference/specs/dashboard-format.md`,
+this journal. Repo-root `pinata.md` written as an untracked handoff artifact
+(not part of the PR). Delivery: docs PR (opened; merge left to the user — it
+proposes un-greenlit work).
+
+**Next:** user greenlights (or edits) Path B; on go-ahead, promote TASK-013 to
+`CURRENT.md` with AC and flip ADR-0004 to accepted. The Pinata KB update is
+handed off separately via `pinata.md`.
