@@ -47,6 +47,7 @@ func parseDashboard(a Areas) (Board, error) {
 		KnowledgeDir: a.KnowledgeDir,
 		PlanningDir:  a.DashboardFile, // shown in the header + startup echo
 		LatestMTime:  areaMTime(a),
+		LinearBase:   a.LinkBase,
 	}}
 	data, err := os.ReadFile(a.DashboardFile)
 	if err != nil {
@@ -63,7 +64,25 @@ func parseDashboard(a Areas) (Board, error) {
 			b.Cards = append(b.Cards, parseDashBacklog(sec.lines)...)
 		}
 	}
+	computeDashboardBadges(b.Cards)
 	return b, nil
+}
+
+// computeDashboardBadges attaches the dashboard-mode chips: a red blocked badge
+// and a group chip. The framework computeBadges is deliberately NOT used — its
+// no-ac hygiene and blocker join don't apply to dashboard cards (ADR-0004).
+func computeDashboardBadges(cards []Card) {
+	for i := range cards {
+		c := &cards[i]
+		var badges []Badge
+		if c.Blocked {
+			badges = append(badges, Badge{Kind: "blocked"})
+		}
+		if c.Group != "" {
+			badges = append(badges, Badge{Kind: "group", Label: c.Group})
+		}
+		c.Badges = badges
+	}
 }
 
 // parseDashTable parses a pipe-table section (Active/Done). The first pipe row

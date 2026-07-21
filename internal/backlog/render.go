@@ -21,6 +21,17 @@ var funcs = template.FuncMap{
 	"badgeText":  badgeText,
 	"truncate":   truncate,
 	"md":         renderMarkdown,
+	"ticketURL":  ticketURL,
+}
+
+// ticketURL joins a Linear base with a ticket id, tolerating a base with or
+// without a trailing slash. An empty base yields just the id (harmless — only
+// dashboard cards have tickets, and dashboard mode always sets a base).
+func ticketURL(base, id string) string {
+	if base == "" {
+		return id
+	}
+	return strings.TrimRight(base, "/") + "/" + id
 }
 
 // truncate shortens a card title for the board so a long, paragraph-sized title
@@ -75,6 +86,7 @@ type boardVM struct {
 	Version     string
 	Columns     []columnVM
 	Systems     []systemChip // multi-system filter bar; empty in single-system mode
+	LinearBase  string       // ticket-chip URL prefix (dashboard mode)
 }
 
 // systemChip is one entry in the multi-system filter bar.
@@ -99,6 +111,7 @@ type taskVM struct {
 	Version     string
 	Card        Card
 	Blockers    []Blocker
+	LinearBase  string // ticket-chip URL prefix (dashboard mode)
 }
 
 // viewModel builds the board view. systemFilter (from ?system=) restricts the
@@ -146,6 +159,7 @@ func viewModel(b Board, systemFilter string, allSystems []string) boardVM {
 		Version:     versionString(b.Meta.LatestMTime),
 		Columns:     cols,
 		Systems:     chips,
+		LinearBase:  b.Meta.LinearBase,
 	}
 }
 
@@ -215,6 +229,8 @@ func badgeClass(kind string) string {
 	switch kind {
 	case "blocked":
 		return "bg-red-100 text-red-800 ring-red-600/20"
+	case "group":
+		return "bg-purple-100 text-purple-800 ring-purple-600/20"
 	case "parking":
 		return "bg-slate-100 text-slate-600 ring-slate-500/20"
 	case "override":
@@ -226,10 +242,10 @@ func badgeClass(kind string) string {
 	}
 }
 
-// badgeText is the chip label: the namespace value for the namespace chip, the
-// kind otherwise.
+// badgeText is the chip label: the badge's Label when it carries one (namespace,
+// group), otherwise the kind itself (blocked, parking, override, no-ac).
 func badgeText(b Badge) string {
-	if b.Kind == "namespace" {
+	if b.Label != "" {
 		return b.Label
 	}
 	return b.Kind

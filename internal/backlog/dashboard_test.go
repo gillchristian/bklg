@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -141,6 +142,54 @@ func TestSplitDashTitle(t *testing.T) {
 		if title != c.title || subtitle != c.subtitle {
 			t.Errorf("splitDashTitle(%q) = (%q, %q), want (%q, %q)", c.in, title, subtitle, c.title, c.subtitle)
 		}
+	}
+}
+
+func TestTicketURL(t *testing.T) {
+	cases := []struct{ base, id, want string }{
+		{"https://linear.app/gopinata/issue/", "PINATA-1", "https://linear.app/gopinata/issue/PINATA-1"},
+		{"https://linear.app/gopinata/issue", "PINATA-1", "https://linear.app/gopinata/issue/PINATA-1"}, // no trailing slash
+		{"", "PINATA-1", "PINATA-1"}, // no base configured
+	}
+	for _, c := range cases {
+		if got := ticketURL(c.base, c.id); got != c.want {
+			t.Errorf("ticketURL(%q,%q) = %q, want %q", c.base, c.id, got, c.want)
+		}
+	}
+}
+
+// TestDashboardBoardRender renders the board in dashboard mode (TASK-015) and
+// checks the blocked badge, group chip, ticket-chip links, and the absence of a
+// spurious no-ac badge / internal id link.
+func TestDashboardBoardRender(t *testing.T) {
+	srv := NewServer(Areas{
+		KnowledgeDir:  "testdata/dashboard",
+		DashboardFile: "testdata/dashboard/work.md",
+		LinkBase:      "https://linear.app/acme/issue/",
+	})
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if rec.Code != 200 {
+		t.Fatalf("board status %d", rec.Code)
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, ">blocked<") {
+		t.Error("board missing a blocked badge (Alpha/Zeta are blocked)")
+	}
+	if !strings.Contains(body, "Product / code") {
+		t.Error("board missing the 'Product / code' group chip")
+	}
+	if !strings.Contains(body, `href="https://linear.app/acme/issue/PINATA-100"`) {
+		t.Error("board missing a ticket chip linking to the configured Linear base")
+	}
+	// Dashboard In-Progress cards are AC-less + id-less: no no-ac badge, and no
+	// internal /<id> detail anchor (only external ticket links).
+	if strings.Contains(body, ">no-ac<") {
+		t.Error("dashboard cards must not carry a no-ac badge")
+	}
+	if strings.Contains(body, `href="/PINATA-100"`) {
+		t.Error("dashboard cards must not emit an internal /<id> link")
 	}
 }
 

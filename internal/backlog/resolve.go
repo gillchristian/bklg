@@ -20,7 +20,14 @@ type Areas struct {
 	// (ADR-0004): the parser reads this one Active/Backlog/Done file instead of
 	// the planning/progress skeleton. Contract: reference/specs/dashboard-format.md.
 	DashboardFile string
+	// LinkBase is the URL prefix for a card's ticket chips in dashboard mode
+	// (e.g. "https://linear.app/gopinata/issue/"); a ticket id is appended to it.
+	LinkBase string
 }
+
+// defaultLinearBase is the ticket-link prefix when none is configured (the
+// gopinata Linear workspace; confirmed by the user 2026-07-21).
+const defaultLinearBase = "https://linear.app/gopinata/issue/"
 
 // RootManifestError signals that the resolved planning area is absent while the
 // knowledge manifest looks like a multi-system root (it lists systems/<name>).
@@ -75,9 +82,10 @@ func Resolve(path, dir string) (Areas, error) {
 	if manifestErr == nil {
 		loc := parseLocations(string(manifestBytes))
 		// A dashboard: key opts into the single-file adapter and short-circuits
-		// planning/progress resolution (ADR-0004).
+		// planning/progress resolution (ADR-0004). A linear: key sets the ticket
+		// link base.
 		if v, ok := loc["dashboard"]; ok {
-			return dashboardAreas(base, path, v)
+			return dashboardAreas(base, path, v, loc["linear"])
 		}
 		if v, ok := loc["planning"]; ok {
 			planning = filepath.Join(path, v)
@@ -114,18 +122,21 @@ func ResolveDashboard(path, dir, rel string) (Areas, error) {
 	if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
 		return Areas{}, fmt.Errorf("path is not a directory: %s", path)
 	}
-	return dashboardAreas(filepath.Join(path, dir), path, rel)
+	return dashboardAreas(filepath.Join(path, dir), path, rel, "")
 }
 
 // dashboardAreas builds Areas for the single-file dashboard adapter. rel is the
 // dashboard file's path (repo-root-relative, like other Locations values), so it
-// is resolved against path, not base.
-func dashboardAreas(base, path, rel string) (Areas, error) {
+// is resolved against path, not base. linkBase falls back to defaultLinearBase.
+func dashboardAreas(base, path, rel, linkBase string) (Areas, error) {
 	file := filepath.Join(path, rel)
 	if fi, err := os.Stat(file); err != nil || fi.IsDir() {
 		return Areas{}, fmt.Errorf("no dashboard file at %s", file)
 	}
-	return Areas{KnowledgeDir: base, DashboardFile: file}, nil
+	if linkBase == "" {
+		linkBase = defaultLinearBase
+	}
+	return Areas{KnowledgeDir: base, DashboardFile: file, LinkBase: linkBase}, nil
 }
 
 // parseLocations extracts the planning/progress entries of a "## Locations"
@@ -159,7 +170,7 @@ func parseLocations(md string) map[string]string {
 		// one of the two keys overrides just that area; the other keeps its
 		// default in Resolve.
 		key := strings.TrimSpace(trimmed[:i])
-		if key == "planning" || key == "progress" || key == "dashboard" {
+		if key == "planning" || key == "progress" || key == "dashboard" || key == "linear" {
 			out[key] = strings.TrimSpace(trimmed[i+1:])
 		}
 	}
