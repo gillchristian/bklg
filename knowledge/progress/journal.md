@@ -715,3 +715,48 @@ commit). D3 vacuous.
 **Next:** TASK-016 — dashboard detail + links out (title-slug route, detail page
 with tickets/material/status, 404 on unknown slug). Completes the adapter. AC in
 `CURRENT.md`.
+
+---
+## 2026-07-21 16:28 — TASK-016 dashboard detail + links out (adapter complete)
+
+**Task:** TASK-016 (BACKLOG v3, ADR-0004) — final slice.
+
+**What I did:** Gave dashboard cards (no id) a detail page keyed by a title
+slug. `assignSlugs` computes a unique url-safe slug per card (`slugify` + a
+used-set guard for `-2`/`-3` collisions, empty → `card`); `Card.RouteKey()`
+(value receiver) returns `ID.Raw` for framework cards and `Slug` for dashboard
+cards; `CardByRawID` → `CardByRoute` (still case-insensitive) drives
+`handleTask`. `board.html` links a dashboard title to `/<slug>`; `task.html`
+gained a `{{if .Card.Dashboard}}` block (subtitle, ticket chips via the now-used
+`taskVM.LinearBase`, Material, Status). Framework detail blocks stay guarded by
+their own fields — no cross-leak. Unknown slug → 404.
+
+**What I verified:** CI + `-race` green. Units: `TestSlugify` (+ uniqueness +
+empty fallback), `TestDashboardDetail` (`/alpha-task`→200 with
+title/ticket-link/Status label+prose; `/no-such-slug`→404), board href="/slug"
+assertion. Real Pinata KB smoke: Active card `/linkable-form-pages`→200 with
+Status + Material + 2 ticket links + In Progress; a Backlog card omits Status
+(Active-only — correct); `/bogus-slug-xyz`→404. Framework regression: `bklg .`
+`/TASK-013`→200, `/NOPE-999`→404. Fresh-context review: PASS 5/5, no
+blocker/high; hostile-fixture injection probe clean.
+
+**What I learned:** The review's one LOW (cross-instance slug uniqueness) is
+unreachable today — dashboard mode is a single-instance `NewServer`, and
+multi-system aggregation (`NewMultiServer`) only resolves framework
+`systems/<name>` instances, so dashboard and framework cards never share a
+board. Rebutted in the PR + parked for if/when multi-system dashboards land.
+
+**What changed:** `model.go` (Card.Slug, RouteKey, CardByRawID→CardByRoute),
+`parse.go` (assignSlugs/slugify), `server.go` (CardByRoute), `templates/
+board.html` + `task.html`, `dashboard_test.go`. Delivery: **PR #33, merged
+`efbcd69`**. D3 vacuous.
+
+**Batch complete:** v3 dashboard adapter (TASK-013…016) shipped — bklg reads the
+real Pinata `work/index.md` end-to-end (board, badges, ticket chips, detail).
+The Pinata KB needs only the one-time `## Locations` `dashboard:` key + the
+leading-`⛔` blocked convention, handed off via repo-root `pinata.md`.
+
+**Next:** CURRENT empty. Parking-lot items remain (self-contained release,
+journal deep-links, JSON API, live push, CI, dashboard auto-detect, Linear
+status sync, ticket-detection tightening, cross-instance slug uniqueness).
+End-of-session sweep, then stop.
