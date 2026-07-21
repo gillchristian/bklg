@@ -1,6 +1,6 @@
 # 0004 — Dashboard adapter: a second input convention
 
-**Date:** 2026-07-21 · **Status:** proposed
+**Date:** 2026-07-21 · **Status:** accepted (TASK-013 promoted 2026-07-21)
 
 ## Context
 
@@ -75,6 +75,5 @@ Implemented as backlog batch **v3 (TASK-013…016)**.
 - Linear stays authoritative for status; the board reflects the file, which may
   lag Linear. A later "Linear status sync on read" is parked (needs network +
   auth; likely stays a non-goal for a zero-dep localhost tool).
-- **Proposed, not accepted:** this records the plan; building it is the v3
-  backlog batch, greenlit and pulled through `CURRENT.md` per the normal flow.
-  Flip to **accepted** when TASK-013 is promoted.
+- **Accepted 2026-07-21** when TASK-013 was promoted into `CURRENT.md`; built as
+  the v3 backlog batch, pulled through `CURRENT.md` per the normal flow.

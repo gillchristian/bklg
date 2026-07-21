@@ -16,6 +16,10 @@ type Areas struct {
 	KnowledgeDir string // base = path/dir
 	PlanningDir  string
 	ProgressDir  string
+	// DashboardFile, when non-empty, selects the single-file dashboard adapter
+	// (ADR-0004): the parser reads this one Active/Backlog/Done file instead of
+	// the planning/progress skeleton. Contract: reference/specs/dashboard-format.md.
+	DashboardFile string
 }
 
 // RootManifestError signals that the resolved planning area is absent while the
@@ -36,13 +40,15 @@ func (e *RootManifestError) Error() string {
 
 var systemRe = regexp.MustCompile(`systems/[A-Za-z0-9._-]+`)
 
-// Resolve locates the planning and progress areas for the repo at path, using
-// the knowledge dir named by dir. Resolution order matches spec §3:
+// Resolve locates the areas for the repo at path, using the knowledge dir named
+// by dir. Resolution order matches spec §3, extended by ADR-0004 for dashboards:
 //
-//  1. base/README.md's "## Locations" block (values are repo-root-relative, so
-//     resolved against path);
-//  2. else default base/planning and base/progress;
-//  3. if the planning dir is absent, a manifest listing systems/<name> is
+//  1. the manifest (base/README.md, else base/index.md) "## Locations" block
+//     (values are repo-root-relative, so resolved against path);
+//  2. if that block carries a dashboard: key, return dashboard-mode Areas
+//     (single-file adapter) and stop — no planning area is required;
+//  3. else the planning/progress keys, or default base/planning + base/progress;
+//  4. if the planning dir is absent, a manifest listing systems/<name> is
 //     treated as a root manifest (RootManifestError); otherwise the error is
 //     "no planning area at <planningDir>".
 func Resolve(path, dir string) (Areas, error) {
@@ -54,10 +60,25 @@ func Resolve(path, dir string) (Areas, error) {
 	planning := filepath.Join(base, "planning")
 	progress := filepath.Join(base, "progress")
 
-	manifest := filepath.Join(base, "README.md")
-	manifestBytes, manifestErr := os.ReadFile(manifest)
+	// The manifest is README.md by convention; dashboard-shaped KBs (ADR-0004)
+	// name theirs index.md, so try that as a fallback. First hit wins.
+	var manifest string
+	var manifestBytes []byte
+	manifestErr := os.ErrNotExist
+	for _, name := range []string{"README.md", "index.md"} {
+		p := filepath.Join(base, name)
+		if data, err := os.ReadFile(p); err == nil {
+			manifest, manifestBytes, manifestErr = p, data, nil
+			break
+		}
+	}
 	if manifestErr == nil {
 		loc := parseLocations(string(manifestBytes))
+		// A dashboard: key opts into the single-file adapter and short-circuits
+		// planning/progress resolution (ADR-0004).
+		if v, ok := loc["dashboard"]; ok {
+			return dashboardAreas(base, path, v)
+		}
 		if v, ok := loc["planning"]; ok {
 			planning = filepath.Join(path, v)
 		}
@@ -82,6 +103,29 @@ func Resolve(path, dir string) (Areas, error) {
 	}
 
 	return Areas{KnowledgeDir: base, PlanningDir: planning, ProgressDir: progress}, nil
+}
+
+// ResolveDashboard builds dashboard-mode Areas for an explicit dashboard file
+// (the --dashboard flag), bypassing manifest/Locations detection. rel is
+// resolved against path (repo-root-relative, matching Locations values), and
+// only the path-is-a-directory and file-exists checks apply — a dashboard KB
+// need not have a planning area at all (ADR-0004).
+func ResolveDashboard(path, dir, rel string) (Areas, error) {
+	if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
+		return Areas{}, fmt.Errorf("path is not a directory: %s", path)
+	}
+	return dashboardAreas(filepath.Join(path, dir), path, rel)
+}
+
+// dashboardAreas builds Areas for the single-file dashboard adapter. rel is the
+// dashboard file's path (repo-root-relative, like other Locations values), so it
+// is resolved against path, not base.
+func dashboardAreas(base, path, rel string) (Areas, error) {
+	file := filepath.Join(path, rel)
+	if fi, err := os.Stat(file); err != nil || fi.IsDir() {
+		return Areas{}, fmt.Errorf("no dashboard file at %s", file)
+	}
+	return Areas{KnowledgeDir: base, DashboardFile: file}, nil
 }
 
 // parseLocations extracts the planning/progress entries of a "## Locations"
@@ -115,7 +159,7 @@ func parseLocations(md string) map[string]string {
 		// one of the two keys overrides just that area; the other keeps its
 		// default in Resolve.
 		key := strings.TrimSpace(trimmed[:i])
-		if key == "planning" || key == "progress" {
+		if key == "planning" || key == "progress" || key == "dashboard" {
 			out[key] = strings.TrimSpace(trimmed[i+1:])
 		}
 	}

@@ -35,4 +35,4 @@ should be able to understand later without asking.
   single-file Active/Backlog/Done dashboards that identify work by inline Linear
   ids (0..N per card) rather than one id per card — for Pinata-shape KBs; pairs
   with the [`../reference/specs/dashboard-format.md`](../reference/specs/dashboard-format.md)
-  contract. Built as backlog v3 (TASK-013…016). **proposed**, 2026-07-21.
+  contract. Built as backlog v3 (TASK-013…016). **accepted**, 2026-07-21.

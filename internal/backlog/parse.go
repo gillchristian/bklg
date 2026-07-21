@@ -16,8 +16,32 @@ type Parser interface {
 	Parse(a Areas) (Board, error)
 }
 
-// NewParser returns the default line-oriented parser (spec §2).
-func NewParser() Parser { return lineParser{} }
+// NewParser returns the default parser. It dispatches on the resolved Areas: a
+// dashboard-mode instance (Areas.DashboardFile set, ADR-0004) uses the
+// single-file dashboard adapter; otherwise the line-oriented framework parser
+// (spec §2). The seam is decision D4.
+func NewParser() Parser { return defaultParser{} }
+
+type defaultParser struct{}
+
+func (defaultParser) Parse(a Areas) (Board, error) {
+	if a.DashboardFile != "" {
+		return parseDashboard(a)
+	}
+	return lineParser{}.Parse(a)
+}
+
+// parseDashboard reads a single-file Active/Backlog/Done dashboard into a Board
+// (ADR-0004; contract in reference/specs/dashboard-format.md). TASK-013 wires
+// resolution + dispatch and returns an empty board (columns render "nothing
+// here"); TASK-014 fills in the table/bullet parsing.
+func parseDashboard(a Areas) (Board, error) {
+	return Board{Meta: Meta{
+		KnowledgeDir: a.KnowledgeDir,
+		PlanningDir:  a.DashboardFile, // shown in the header + startup echo
+		LatestMTime:  areaMTime(a),
+	}}, nil
+}
 
 type lineParser struct{}
 
@@ -56,13 +80,19 @@ func (lineParser) Parse(a Areas) (Board, error) {
 // freshness stamp behind /_v. Cheap (4 stats), so /_v can poll without a full
 // parse. Missing files are skipped.
 func areaMTime(a Areas) time.Time {
-	var latest time.Time
-	for _, p := range []string{
+	// Dashboard mode watches its single file; framework mode the four planning
+	// and progress files.
+	files := []string{
 		filepath.Join(a.PlanningDir, "CURRENT.md"),
 		filepath.Join(a.PlanningDir, "BACKLOG.md"),
 		filepath.Join(a.PlanningDir, "DONE.md"),
 		filepath.Join(a.ProgressDir, "blockers.md"),
-	} {
+	}
+	if a.DashboardFile != "" {
+		files = []string{a.DashboardFile}
+	}
+	var latest time.Time
+	for _, p := range files {
 		if fi, err := os.Stat(p); err == nil {
 			if m := fi.ModTime(); m.After(latest) {
 				latest = m

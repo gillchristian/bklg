@@ -133,3 +133,73 @@ func TestDisplayPath(t *testing.T) {
 		}
 	}
 }
+
+// --- dashboard adapter resolution (TASK-013, ADR-0004) ----------------------
+
+func TestResolveDashboardViaLocations(t *testing.T) { // AC1 + AC2
+	// The fixture's only manifest is index.md (not README.md) and it carries a
+	// dashboard: key; resolution must find the index.md manifest, select
+	// dashboard mode, and not require a planning/ dir (there is none).
+	root := "testdata/resolve/dashboard"
+	a, err := Resolve(root, "knowledge")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(root, "knowledge/work/index.md")
+	if a.DashboardFile != want {
+		t.Errorf("DashboardFile = %q, want %q", a.DashboardFile, want)
+	}
+	if a.PlanningDir != "" || a.ProgressDir != "" {
+		t.Errorf("dashboard mode should not set planning/progress, got planning=%q progress=%q", a.PlanningDir, a.ProgressDir)
+	}
+	if a.KnowledgeDir != filepath.Join(root, "knowledge") {
+		t.Errorf("KnowledgeDir = %q, want %q", a.KnowledgeDir, filepath.Join(root, "knowledge"))
+	}
+}
+
+func TestResolveDashboardFlag(t *testing.T) { // AC3
+	root := "testdata/resolve/dashboard"
+	a, err := ResolveDashboard(root, "knowledge", "knowledge/work/index.md")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(root, "knowledge/work/index.md")
+	if a.DashboardFile != want {
+		t.Errorf("DashboardFile = %q, want %q", a.DashboardFile, want)
+	}
+}
+
+func TestResolveDashboardMissingFile(t *testing.T) { // AC4
+	// Via the flag:
+	if _, err := ResolveDashboard("testdata/resolve/dashboard", "knowledge", "knowledge/nope.md"); err == nil || !strings.Contains(err.Error(), "no dashboard file at") {
+		t.Errorf("flag: want 'no dashboard file at' error, got %v", err)
+	}
+	// A non-directory path is still rejected before the file check:
+	if _, err := ResolveDashboard("testdata/resolve/afile.txt", "knowledge", "x.md"); err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("path: want 'not a directory' error, got %v", err)
+	}
+	// Via a manifest dashboard: key pointing at a nonexistent file — must fail
+	// with the same error, not fall through to the planning-area check:
+	if _, err := Resolve("testdata/resolve/dashboard-missing", "knowledge"); err == nil || !strings.Contains(err.Error(), "no dashboard file at") {
+		t.Errorf("locations: want 'no dashboard file at' error, got %v", err)
+	}
+}
+
+func TestResolveFrameworkModeUnaffected(t *testing.T) { // AC5
+	// A repo with a normal README.md + planning area still resolves framework
+	// mode (no DashboardFile), i.e. the manifest-lookup widening didn't regress.
+	a, err := Resolve("testdata/resolve/withloc", "knowledge")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.DashboardFile != "" {
+		t.Errorf("framework repo should not be dashboard mode, got DashboardFile=%q", a.DashboardFile)
+	}
+}
+
+func TestParseLocationsDashboard(t *testing.T) {
+	loc := parseLocations("## Locations\n\ndashboard: work/index.md\n\n## End\n")
+	if loc["dashboard"] != "work/index.md" {
+		t.Errorf("dashboard = %q, want work/index.md", loc["dashboard"])
+	}
+}
