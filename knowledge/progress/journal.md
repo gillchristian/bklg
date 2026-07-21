@@ -631,3 +631,44 @@ Delivery: **PR #27, merged `6cea51f`**. D3 remote check vacuous (no CI).
 **Next:** TASK-014 — dashboard parser → model (Active/Done tables + Backlog
 bullet groups → `[]Card` with Tickets/Group/Material; escaped-pipe handling;
 defensive warnings). AC in `CURRENT.md`.
+
+---
+## 2026-07-21 15:44 — TASK-014 dashboard parser → model
+
+**Task:** TASK-014 (BACKLOG v3, ADR-0004).
+
+**What I did:** Implemented `parseDashboard` (replacing TASK-013's empty stub).
+Active/Done are parsed as pipe tables — `splitCells` splits on unescaped `|` and
+unescapes `\|` to a literal, `mapDashColumns` finds the title/material/status
+columns by header name (`Work`/`What`, `Material`/`Record`, `…Status…`),
+separator rows skipped. Backlog is bullet groups: a `**Group:**` line sets the
+label for its bullets. `splitDashTitle` takes the leading `**bold**` as title +
+the em-dash subtitle; `findTickets` collects distinct inline `[A-Z]+-\d+`
+(first-seen; `#NNN` never matches); blocked = a leading `⛔`/`**Blocked` marker.
+Empty-title rows → `dashboard-malformed` warning (+ /_diag explanation) and skip.
+`Card` gained optional Dashboard/Subtitle/Tickets/Group/Material/Status/Blocked.
+
+**What I verified:** CI + `-race` green. `TestParseDashboard` on a rich fixture:
+In Progress 3 / Backlog 4 / Done 2, asserting per-card title/subtitle/column/
+tickets/group/material/blocked, the escaped-pipe row (`cond A || cond B || cond
+C` intact), the `#11531`/`#99` PR-ref exclusion, and the malformed-row warning.
+Real Pinata KB smoke: `bklg --dashboard knowledge/work/index.md
+~/dev/Pinata-dev/Pinata` → `/`=200 with **In Progress 4 / Backlog 12 / Done 16 =
+32 cards**, clean bold titles, `/_diag`="No warnings — parsed cleanly", `/_v`
+live. Fresh-context review (diff+AC only): PASS 5/5, no blocker/high.
+
+**What I learned:** The review caught a real subtitle-split bug —
+`splitDashTitle` searched the whole cell for ` — `, so `**Foo — bar** — sub`
+mis-captured the subtitle. Fixed to search only after the matched bold, locked
+with `TestSplitDashTitle`. Also acknowledged (per-contract) that the ticket
+regex matches `UTF-8`-style tokens → parked a tightening follow-up.
+
+**What changed:** `parse.go` (parseDashboard + table/backlog/title/cell/ticket
+helpers), `model.go` (Card fields + Warning.Kind doc), `render.go`
+(`dashboard-malformed` /_diag explanation), `dashboard_test.go` +
+`testdata/dashboard/work.md`. Delivery: **PR #29, merged `2697702`** (+ fix
+commit `bc33797`). D3 vacuous.
+
+**Next:** TASK-015 — dashboard badges + board render (blocked badge, Linear
+ticket chips with configurable base, group chip; tolerate AC-less/id-less
+cards). AC in `CURRENT.md`.
