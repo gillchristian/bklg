@@ -74,6 +74,15 @@ type Card struct {
 	ParkingLot       bool
 	System           string // owning system in aggregate/multi-system mode; "" single-system
 	Raw              string // the source block, shown verbatim on the detail page
+
+	// Dashboard-adapter fields (ADR-0004); zero-valued for framework-mode cards.
+	Dashboard bool   // parsed from a single-file dashboard, not the planning skeleton
+	Subtitle  string // the row/bullet text after the leading **bold** title (post em-dash)
+	Tickets   []ID   // inline Linear-style ids found in the row (0..N), first-seen order
+	Group     string // backlog group label (e.g. "Product / code"); "" if ungrouped
+	Material  string // the row's Material/Record cell (raw markdown, e.g. "[x](y)")
+	Status    string // the row's Status/next-step cell (Active), unescaped; "" for Done/Backlog
+	Blocked   bool   // a leading ⛔ / **Blocked** marker (dashboard's blocked signal)
 }
 
 // Blocker is a parsed blockers.md entry (spec §4). Populated in TASK-004.

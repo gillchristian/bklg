@@ -167,13 +167,14 @@ type diagVM struct {
 
 // diagKindOrder fixes the display order of known warning kinds (most
 // invariant-violating first); explanations say what each means and what to do.
-var diagKindOrder = []string{"current-multiple", "shipped-missing-done", "done-not-ticked", "malformed-done", "read-error"}
+var diagKindOrder = []string{"current-multiple", "shipped-missing-done", "done-not-ticked", "malformed-done", "dashboard-malformed", "read-error"}
 
 var diagExplain = map[string][2]string{
 	"current-multiple":     {"More than one active task", "CURRENT holds more than one task under ## Active. The framework's one-task-at-a-time invariant expects exactly one — finish or move the extras."},
 	"shipped-missing-done": {"Shipped, but not in DONE.md", "Checked [x] in BACKLOG but with no DONE.md entry. Add a DONE entry — or, if this instance keeps the full record inline on the [x] line, this is expected and purely informational."},
 	"done-not-ticked":      {"In DONE.md, not ticked in BACKLOG", "A DONE.md entry whose id isn't checked [x] in BACKLOG. Tick it so the backlog stays an accurate shipping index."},
 	"malformed-done":       {"Malformed DONE entry", "A DONE.md entry didn't match either supported shape; it was parsed best-effort."},
+	"dashboard-malformed":  {"Malformed dashboard row", "A dashboard table row or bullet couldn't be parsed (e.g. an empty title cell); it was skipped. Check the row against the dashboard format contract."},
 	"read-error":           {"Couldn't read a file", "A planning/progress file couldn't be read; the board renders best-effort without it."},
 }
 
