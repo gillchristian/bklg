@@ -14,12 +14,12 @@ one; see framework/delivery.md.)
 
 ## Active
 
-### TASK-015 — Dashboard badges + board render
-**Source:** BACKLOG v3 (dashboard adapter; ADR-0004)
+### TASK-016 — Dashboard detail + links out
+**Source:** BACKLOG v3 (dashboard adapter; ADR-0004) — final slice
 **Acceptance criteria:**
-- [ ] Dashboard `Blocked` cards show a red `blocked` badge on the board and detail page; non-blocked ones don't. *(decider: render/unit test + smoke — the leading-`⛔` Active row on the real Pinata KB renders a `blocked` badge; grep the HTML.)*
-- [ ] Each card's `Tickets` render as chips linking to `<linear-base><ID>` (default `https://linear.app/gopinata/issue/PINATA-602`). *(decider: smoke — board HTML contains `<a href="https://linear.app/gopinata/issue/PINATA-...">`; unit test on the href builder.)*
-- [ ] Linear base configurable via a `--linear-base` flag and a `linear:` Locations key (flag wins), trailing slash tolerated. *(decider: smoke — `--linear-base https://example.com/i/` makes ticket hrefs use that base; unit test.)*
-- [ ] Backlog cards show their `Group` as a chip. *(decider: smoke/render — a `Product / code` chip appears on the relevant card.)*
-- [ ] Board tolerates AC-less, id-less, multi-ticket dashboard cards: no spurious `no-ac` badge, no broken `/{id}` link (dashboard cards have no single ID). *(decider: render test / smoke — dashboard In-Progress cards carry no yellow `no-ac` badge and no `/<id>` anchor.)*
-**Notes:** Rendering slice — the model (Blocked/Tickets/Group) already lands from TASK-014. Add a `group` badge kind + a ticket-chip block (anchors) to `board.html`/`task.html`; thread the Linear base through `Meta`/view models (resolved in `Resolve`/`ResolveDashboard` + `main`). Dashboard cards compute their own badges (blocked + group) — do NOT run the framework `computeBadges` (its `no-ac`/blocker join don't apply). Detail routing for dashboard cards (title slug) is TASK-016.
+- [ ] Each dashboard card gets a stable url-safe slug from its title; duplicate titles get distinct slugs; an empty slug falls back. *(decider: unit test — `slugify` output + `assignSlugs` uniqueness on a constructed duplicate-title slice.)*
+- [ ] `GET /<slug>` renders a dashboard card's detail: title, column, linked ticket chips (to the Linear base), Material, Status, and the collapsed raw block. *(decider: server test — GET the Alpha card's slug → 200 containing the `PINATA-100` Linear link + Material + Status; smoke on the real Pinata KB.)*
+- [ ] The board links each dashboard card's title to its `/<slug>` detail page. *(decider: board render test — a dashboard card's HTML contains `href="/<slug>"`.)*
+- [ ] Unknown slug → 404. *(decider: server test — `GET /no-such-slug` → 404.)*
+- [ ] Framework-mode detail (`/<ID>`) still works unchanged. *(decider: existing `detail_test.go` green; smoke — `bklg .` `/<id>` → 200.)*
+**Notes:** Add `Card.Slug` (computed in `parseDashboard` via `assignSlugs`, unique across the board) + `Card.RouteKey()` (value receiver: `ID.Raw` for framework, `Slug` for dashboard) + `Board.CardByRoute` (case-insensitive); `handleTask` looks up by route key. `task.html` gains a `{{if .Card.Dashboard}}` block (subtitle, ticket chips via the now-used `taskVM.LinearBase`, Material, Status); framework blocks stay guarded by their own fields. `board.html` links the dashboard card title to `/<slug>`. This completes the adapter.

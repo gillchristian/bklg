@@ -672,3 +672,46 @@ commit `bc33797`). D3 vacuous.
 **Next:** TASK-015 — dashboard badges + board render (blocked badge, Linear
 ticket chips with configurable base, group chip; tolerate AC-less/id-less
 cards). AC in `CURRENT.md`.
+
+---
+## 2026-07-21 16:10 — TASK-015 dashboard badges + board render
+
+**Task:** TASK-015 (BACKLOG v3, ADR-0004).
+
+**What I did:** Rendered the dashboard model. `computeDashboardBadges` gives
+dashboard cards a red `blocked` badge (from the leading-⛔ signal) + a purple
+`group` chip — the framework `computeBadges` is intentionally NOT run on them
+(its no-ac hygiene + blocker join don't apply). Ticket ids render as chips
+linking to `<linear-base><id>`; the base is configurable via a `linear:`
+Locations key and a `--linear-base` flag (flag wins), default the gopinata
+workspace, trailing slash tolerated (`ticketURL`). Threaded `Areas.LinkBase →
+Meta.LinearBase →` the board/task view models. `board.html` shows a muted
+subtitle line + the ticket chips; `badgeText` now returns a badge's Label when
+set (namespace + group).
+
+**What I verified:** CI + `-race` green. Units: `TestTicketURL` (slash/empty),
+`TestDashboardBoardRender` (blocked badge, group chip, exact ticket href, no
+no-ac, no internal id link), `TestDashboardBadges` (blocked positive+negative,
+no-ac exclusion), resolve tests (linear: key → acme, default via flag path).
+Real Pinata KB smoke: `/`=200, **29 ticket chips** to `linear.app/gopinata`,
+`Product / code` + `Knowledge base` group chips, **0** no-ac, `--linear-base
+https://example.com/i/` override honored. Fresh-context review: PASS 5/5, no
+blocker/high; it built an html/template harness and confirmed a malicious
+`linear:` base or ticket id is neutralized (`#ZgotmplZ`/percent-encoded).
+
+**What I learned:** The real Pinata Active rows don't lead with ⛔ yet (the
+maintainer adds those per the format contract via `pinata.md`), so no blocked
+badge shows there — correct. The blocked path is proven by the fixture
+(Alpha/Zeta). html/template's contextual href escaping is what makes the
+repo-controlled Linear base safe — not the id regex.
+
+**What changed:** `resolve.go` (LinkBase + linear: key + default),
+`model.go` (Meta.LinearBase), `parse.go` (computeDashboardBadges + Meta wiring),
+`render.go` (ticketURL, group class, badgeText, VM fields), `server.go`
+(taskVM.LinearBase), `main.go` (--linear-base), `templates/board.html`,
+tests + fixture linear: key. Delivery: **PR #31, merged `55eb7d1`** (+ test
+commit). D3 vacuous.
+
+**Next:** TASK-016 — dashboard detail + links out (title-slug route, detail page
+with tickets/material/status, 404 on unknown slug). Completes the adapter. AC in
+`CURRENT.md`.
