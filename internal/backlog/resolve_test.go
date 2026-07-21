@@ -178,6 +178,11 @@ func TestResolveDashboardMissingFile(t *testing.T) { // AC4
 	if _, err := ResolveDashboard("testdata/resolve/afile.txt", "knowledge", "x.md"); err == nil || !strings.Contains(err.Error(), "not a directory") {
 		t.Errorf("path: want 'not a directory' error, got %v", err)
 	}
+	// Via a manifest dashboard: key pointing at a nonexistent file — must fail
+	// with the same error, not fall through to the planning-area check:
+	if _, err := Resolve("testdata/resolve/dashboard-missing", "knowledge"); err == nil || !strings.Contains(err.Error(), "no dashboard file at") {
+		t.Errorf("locations: want 'no dashboard file at' error, got %v", err)
+	}
 }
 
 func TestResolveFrameworkModeUnaffected(t *testing.T) { // AC5
