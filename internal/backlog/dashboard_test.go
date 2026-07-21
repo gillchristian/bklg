@@ -127,6 +127,23 @@ func TestParseDashboard(t *testing.T) {
 	}
 }
 
+func TestSplitDashTitle(t *testing.T) {
+	cases := []struct{ in, title, subtitle string }{
+		{"**Alpha task** — first active thing", "Alpha task", "first active thing"},
+		{"**Just bold**", "Just bold", ""},
+		{"Plain — with subtitle", "Plain", "with subtitle"},
+		{"Plain only", "Plain only", ""},
+		// Em-dash INSIDE the bold phrase must not split the subtitle early.
+		{"**Foo — bar** — realsubtitle", "Foo — bar", "realsubtitle"},
+	}
+	for _, c := range cases {
+		title, subtitle := splitDashTitle(c.in)
+		if title != c.title || subtitle != c.subtitle {
+			t.Errorf("splitDashTitle(%q) = (%q, %q), want (%q, %q)", c.in, title, subtitle, c.title, c.subtitle)
+		}
+	}
+}
+
 func hasWarnKind(ws []Warning, kind string) bool {
 	for _, w := range ws {
 		if w.Kind == kind {

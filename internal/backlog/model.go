@@ -106,7 +106,7 @@ type Meta struct {
 // Warning is a parse/reconciliation diagnostic surfaced on /_diag. Kind groups
 // like warnings; TaskRaw (when set) links the warning to a task's detail page.
 type Warning struct {
-	Kind    string // shipped-missing-done | done-not-ticked | current-multiple | read-error | malformed-done
+	Kind    string // shipped-missing-done | done-not-ticked | current-multiple | read-error | malformed-done | dashboard-malformed
 	Message string
 	TaskRaw string // id involved, for linking (optional)
 }

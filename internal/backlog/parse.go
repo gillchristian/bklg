@@ -152,19 +152,24 @@ func parseDashBacklog(lines []string) []Card {
 // cell is the title (still splitting off an em-dash subtitle if present).
 func splitDashTitle(s string) (title, subtitle string) {
 	s = strings.TrimSpace(s)
-	sub := func() string {
-		if i := strings.Index(s, emDash); i >= 0 {
-			return strings.TrimSpace(s[i+len(emDash):])
-		}
-		return ""
-	}
+	// Search for the subtitle separator only in the text AFTER the bold title,
+	// so an em-dash inside the bold phrase ("**Foo — bar** — sub") doesn't split
+	// the subtitle in the wrong place.
+	rest := s
 	if m := leadingBoldRe.FindStringSubmatch(s); m != nil {
-		return strings.TrimSpace(m[1]), sub()
+		title = strings.TrimSpace(m[1])
+		rest = s[len(m[0]):]
 	}
-	if i := strings.Index(s, emDash); i >= 0 {
-		return strings.TrimSpace(s[:i]), sub()
+	if i := strings.Index(rest, emDash); i >= 0 {
+		if title == "" {
+			title = strings.TrimSpace(rest[:i])
+		}
+		return title, strings.TrimSpace(rest[i+len(emDash):])
 	}
-	return s, ""
+	if title == "" {
+		title = strings.TrimSpace(rest)
+	}
+	return title, ""
 }
 
 // splitCells splits a markdown table row on unescaped "|", unescaping "\|" to a
