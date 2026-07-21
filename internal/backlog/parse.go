@@ -31,16 +31,234 @@ func (defaultParser) Parse(a Areas) (Board, error) {
 	return lineParser{}.Parse(a)
 }
 
+var (
+	leadingBoldRe = regexp.MustCompile(`^\*\*(.+?)\*\*`)
+	ticketRe      = regexp.MustCompile(`[A-Z]+-\d+`) // inline Linear-style ids
+	groupHeadRe   = regexp.MustCompile(`^\*\*(.+):\*\*$`)
+	tableSepRe    = regexp.MustCompile(`^:?-+:?$`)
+)
+
 // parseDashboard reads a single-file Active/Backlog/Done dashboard into a Board
-// (ADR-0004; contract in reference/specs/dashboard-format.md). TASK-013 wires
-// resolution + dispatch and returns an empty board (columns render "nothing
-// here"); TASK-014 fills in the table/bullet parsing.
+// (ADR-0004; contract in reference/specs/dashboard-format.md). Active/Done are
+// pipe tables, Backlog is bullet groups. Parsing is defensive: a row it can't
+// read becomes a warning and is skipped, never a crash (spec §2).
 func parseDashboard(a Areas) (Board, error) {
-	return Board{Meta: Meta{
+	b := Board{Meta: Meta{
 		KnowledgeDir: a.KnowledgeDir,
 		PlanningDir:  a.DashboardFile, // shown in the header + startup echo
 		LatestMTime:  areaMTime(a),
-	}}, nil
+	}}
+	data, err := os.ReadFile(a.DashboardFile)
+	if err != nil {
+		b.Warnings = append(b.Warnings, Warning{Kind: "read-error", Message: "could not read dashboard " + a.DashboardFile + ": " + err.Error()})
+		return b, nil
+	}
+	for _, sec := range splitSections(string(data)) {
+		switch strings.ToLower(strings.TrimSpace(sec.name)) {
+		case "active":
+			b.Cards = append(b.Cards, parseDashTable(sec.lines, ColInProgress, &b.Warnings)...)
+		case "done":
+			b.Cards = append(b.Cards, parseDashTable(sec.lines, ColDone, &b.Warnings)...)
+		case "backlog":
+			b.Cards = append(b.Cards, parseDashBacklog(sec.lines)...)
+		}
+	}
+	return b, nil
+}
+
+// parseDashTable parses a pipe-table section (Active/Done). The first pipe row
+// is the header (mapping the title/material/status columns by name), the dashes
+// row is skipped, and each remaining row is a card. Cells split on unescaped
+// "|"; "\|" is a literal pipe.
+func parseDashTable(lines []string, col Column, warnings *[]Warning) []Card {
+	var cards []Card
+	titleIdx, materialIdx, statusIdx := 0, -1, -1
+	haveHeader := false
+	for _, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if !strings.HasPrefix(t, "|") {
+			continue
+		}
+		cells := splitCells(t)
+		if isSeparatorRow(cells) {
+			continue
+		}
+		if !haveHeader {
+			titleIdx, materialIdx, statusIdx = mapDashColumns(cells)
+			haveHeader = true
+			continue
+		}
+		titleCell := cellAt(cells, titleIdx)
+		if strings.TrimSpace(titleCell) == "" {
+			*warnings = append(*warnings, Warning{Kind: "dashboard-malformed", Message: "dashboard row with an empty title cell: " + t})
+			continue
+		}
+		title, subtitle := splitDashTitle(titleCell)
+		card := Card{
+			Dashboard: true,
+			Column:    col,
+			Title:     title,
+			Subtitle:  subtitle,
+			Material:  cellAt(cells, materialIdx),
+			Status:    cellAt(cells, statusIdx),
+			Tickets:   findTickets(t),
+			Raw:       t,
+		}
+		if col != ColDone {
+			card.Blocked = hasBlockedMarker(card.Status)
+		}
+		cards = append(cards, card)
+	}
+	return cards
+}
+
+// parseDashBacklog parses the Backlog section's bullet groups: a "**Group:**"
+// line sets the current group label; each "- " bullet under it is a card.
+func parseDashBacklog(lines []string) []Card {
+	var cards []Card
+	group := ""
+	for _, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if m := groupHeadRe.FindStringSubmatch(t); m != nil {
+			group = strings.TrimSpace(m[1])
+			continue
+		}
+		if !strings.HasPrefix(t, "- ") {
+			continue
+		}
+		content := strings.TrimSpace(strings.TrimPrefix(t, "- "))
+		if content == "" {
+			continue
+		}
+		blocked := hasBlockedMarker(content)
+		content = strings.TrimSpace(strings.TrimPrefix(content, "⛔")) // clean the title source
+		title, subtitle := splitDashTitle(content)
+		cards = append(cards, Card{
+			Dashboard: true,
+			Column:    ColBacklog,
+			Title:     title,
+			Subtitle:  subtitle,
+			Group:     group,
+			Tickets:   findTickets(t),
+			Blocked:   blocked,
+			Raw:       t,
+		})
+	}
+	return cards
+}
+
+// splitDashTitle splits a row/bullet's title cell into the leading **bold**
+// title and the subtitle after the em-dash. With no leading bold, the whole
+// cell is the title (still splitting off an em-dash subtitle if present).
+func splitDashTitle(s string) (title, subtitle string) {
+	s = strings.TrimSpace(s)
+	// Search for the subtitle separator only in the text AFTER the bold title,
+	// so an em-dash inside the bold phrase ("**Foo — bar** — sub") doesn't split
+	// the subtitle in the wrong place.
+	rest := s
+	if m := leadingBoldRe.FindStringSubmatch(s); m != nil {
+		title = strings.TrimSpace(m[1])
+		rest = s[len(m[0]):]
+	}
+	if i := strings.Index(rest, emDash); i >= 0 {
+		if title == "" {
+			title = strings.TrimSpace(rest[:i])
+		}
+		return title, strings.TrimSpace(rest[i+len(emDash):])
+	}
+	if title == "" {
+		title = strings.TrimSpace(rest)
+	}
+	return title, ""
+}
+
+// splitCells splits a markdown table row on unescaped "|", unescaping "\|" to a
+// literal "|", and drops the empty cells produced by the bounding pipes.
+func splitCells(row string) []string {
+	var cells []string
+	var b strings.Builder
+	rs := []rune(row)
+	for i := 0; i < len(rs); i++ {
+		if rs[i] == '\\' && i+1 < len(rs) && rs[i+1] == '|' {
+			b.WriteRune('|')
+			i++
+			continue
+		}
+		if rs[i] == '|' {
+			cells = append(cells, strings.TrimSpace(b.String()))
+			b.Reset()
+			continue
+		}
+		b.WriteRune(rs[i])
+	}
+	cells = append(cells, strings.TrimSpace(b.String()))
+	if len(cells) > 0 && cells[0] == "" {
+		cells = cells[1:]
+	}
+	if len(cells) > 0 && cells[len(cells)-1] == "" {
+		cells = cells[:len(cells)-1]
+	}
+	return cells
+}
+
+func isSeparatorRow(cells []string) bool {
+	if len(cells) == 0 {
+		return false
+	}
+	for _, c := range cells {
+		if !tableSepRe.MatchString(strings.TrimSpace(c)) {
+			return false
+		}
+	}
+	return true
+}
+
+// mapDashColumns finds the title/material/status column indices by header name,
+// defaulting title to the first column when no "Work"/"What" header is found.
+func mapDashColumns(header []string) (titleIdx, materialIdx, statusIdx int) {
+	titleIdx, materialIdx, statusIdx = 0, -1, -1
+	for i, h := range header {
+		switch hl := strings.ToLower(strings.TrimSpace(h)); {
+		case hl == "work" || hl == "what":
+			titleIdx = i
+		case hl == "material" || hl == "record":
+			materialIdx = i
+		case strings.Contains(hl, "status"):
+			statusIdx = i
+		}
+	}
+	return
+}
+
+func cellAt(cells []string, i int) string {
+	if i < 0 || i >= len(cells) {
+		return ""
+	}
+	return cells[i]
+}
+
+// findTickets collects distinct inline Linear-style ids (e.g. PINATA-602) in
+// first-seen order. GitHub PR refs (#123) never match the id pattern.
+func findTickets(s string) []ID {
+	var out []ID
+	seen := map[string]bool{}
+	for _, m := range ticketRe.FindAllString(s, -1) {
+		if seen[m] {
+			continue
+		}
+		seen[m] = true
+		if id := parseID(m); id != nil {
+			out = append(out, *id)
+		}
+	}
+	return out
+}
+
+// hasBlockedMarker reports whether text leads with the dashboard blocked marker
+// (a ⛔ or **Blocked); a mid-text ⛔ (a decision marker) does not count.
+func hasBlockedMarker(s string) bool {
+	s = strings.TrimSpace(s)
+	return strings.HasPrefix(s, "⛔") || strings.HasPrefix(s, "**Blocked")
 }
 
 type lineParser struct{}
