@@ -101,6 +101,7 @@ type Meta struct {
 	PlanningDir  string
 	ProgressDir  string
 	LatestMTime  time.Time
+	LinearBase   string // ticket-chip URL prefix in dashboard mode (ADR-0004)
 }
 
 // Warning is a parse/reconciliation diagnostic surfaced on /_diag. Kind groups

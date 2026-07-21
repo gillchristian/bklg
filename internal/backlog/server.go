@@ -154,6 +154,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		Version:     versionString(b.Meta.LatestMTime),
 		Card:        *card,
 		Blockers:    refs,
+		LinearBase:  b.Meta.LinearBase,
 	}
 	var buf bytes.Buffer
 	if err := taskTmpl.ExecuteTemplate(&buf, "layout", vm); err != nil {

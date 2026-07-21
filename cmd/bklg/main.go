@@ -28,7 +28,7 @@ import (
 // them — the contract is a single optional [path]). Zero dependencies, spec §9.
 func splitArgs(argv []string) (path string, flagArgs, extra []string) {
 	path = "."
-	takesValue := map[string]bool{"--port": true, "-port": true, "--dir": true, "-dir": true, "--dashboard": true, "-dashboard": true}
+	takesValue := map[string]bool{"--port": true, "-port": true, "--dir": true, "-dir": true, "--dashboard": true, "-dashboard": true, "--linear-base": true, "-linear-base": true}
 	seenPath := false
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
@@ -60,6 +60,7 @@ func main() {
 	port := fs.Int("port", 1235, "port to listen on")
 	dir := fs.String("dir", "knowledge", "knowledge dir, relative to [path]")
 	dashboard := fs.String("dashboard", "", "single-file dashboard to read (relative to [path]); selects the dashboard adapter (ADR-0004)")
+	linearBase := fs.String("linear-base", "", "URL prefix for ticket chips in dashboard mode (overrides the manifest's linear: key)")
 	if err := fs.Parse(flagArgs); err != nil {
 		if err == flag.ErrHelp {
 			os.Exit(0) // -h/--help is a successful, requested action
@@ -83,7 +84,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "bklg: %v\n", err)
 			os.Exit(1)
 		}
-		srv, echo = dashboardServer(areas)
+		srv, echo = dashboardServer(areas, *linearBase)
 	} else {
 		areas, err := backlog.Resolve(path, *dir)
 		switch {
@@ -101,7 +102,7 @@ func main() {
 			}
 		case areas.DashboardFile != "":
 			// A dashboard: key in the manifest selected the adapter (ADR-0004).
-			srv, echo = dashboardServer(areas)
+			srv, echo = dashboardServer(areas, *linearBase)
 		default:
 			srv = backlog.NewServer(areas)
 			echo = func() {
@@ -132,8 +133,12 @@ func main() {
 }
 
 // dashboardServer builds a single-instance Server for a resolved dashboard-mode
-// Areas and the startup echo line for it (ADR-0004).
-func dashboardServer(a backlog.Areas) (*backlog.Server, func()) {
+// Areas and the startup echo line for it (ADR-0004). A non-empty linearBase
+// (the --linear-base flag) overrides the manifest's link base.
+func dashboardServer(a backlog.Areas, linearBase string) (*backlog.Server, func()) {
+	if linearBase != "" {
+		a.LinkBase = linearBase
+	}
 	srv := backlog.NewServer(a)
 	echo := func() {
 		fmt.Printf("  knowledge: %s   dashboard: %s\n",

@@ -27,6 +27,12 @@
           {{if .ID}}<a class="font-mono text-xs text-blue-700 hover:underline" href="/{{.ID.Raw}}">{{.ID.Raw}}</a>
           <span class="text-gray-400">·</span> {{end}}<span>{{md (truncate .Title 140)}}</span>
         </div>
+        {{if .Subtitle}}<div class="text-xs text-gray-500 leading-snug mt-0.5">{{md (truncate .Subtitle 120)}}</div>{{end}}
+        {{if .Tickets}}
+        <div class="mt-1.5 flex flex-wrap gap-1">
+          {{range .Tickets}}<a href="{{ticketURL $.LinearBase .Raw}}" target="_blank" rel="noopener" class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-600/20 hover:bg-blue-100">{{.Raw}}</a>{{end}}
+        </div>
+        {{end}}
       </li>
       {{end}}
     </ul>

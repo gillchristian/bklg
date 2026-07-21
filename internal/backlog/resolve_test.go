@@ -155,6 +155,20 @@ func TestResolveDashboardViaLocations(t *testing.T) { // AC1 + AC2
 	if a.KnowledgeDir != filepath.Join(root, "knowledge") {
 		t.Errorf("KnowledgeDir = %q, want %q", a.KnowledgeDir, filepath.Join(root, "knowledge"))
 	}
+	if a.LinkBase != "https://linear.app/acme/issue/" {
+		t.Errorf("LinkBase = %q, want the manifest's linear: value", a.LinkBase)
+	}
+}
+
+func TestResolveDashboardDefaultLinkBase(t *testing.T) { // TASK-015
+	// The flag path has no manifest to read a linear: key from, so it defaults.
+	a, err := ResolveDashboard("testdata/resolve/dashboard", "knowledge", "knowledge/work/index.md")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.LinkBase != defaultLinearBase {
+		t.Errorf("LinkBase = %q, want default %q", a.LinkBase, defaultLinearBase)
+	}
 }
 
 func TestResolveDashboardFlag(t *testing.T) { // AC3

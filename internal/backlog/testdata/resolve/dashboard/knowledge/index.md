@@ -6,3 +6,4 @@ the manifest's Locations block. There is deliberately no planning/ area.
 ## Locations
 
 dashboard: knowledge/work/index.md
+linear: https://linear.app/acme/issue/

@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -141,6 +142,94 @@ func TestSplitDashTitle(t *testing.T) {
 		if title != c.title || subtitle != c.subtitle {
 			t.Errorf("splitDashTitle(%q) = (%q, %q), want (%q, %q)", c.in, title, subtitle, c.title, c.subtitle)
 		}
+	}
+}
+
+func TestTicketURL(t *testing.T) {
+	cases := []struct{ base, id, want string }{
+		{"https://linear.app/gopinata/issue/", "PINATA-1", "https://linear.app/gopinata/issue/PINATA-1"},
+		{"https://linear.app/gopinata/issue", "PINATA-1", "https://linear.app/gopinata/issue/PINATA-1"}, // no trailing slash
+		{"", "PINATA-1", "PINATA-1"}, // no base configured
+	}
+	for _, c := range cases {
+		if got := ticketURL(c.base, c.id); got != c.want {
+			t.Errorf("ticketURL(%q,%q) = %q, want %q", c.base, c.id, got, c.want)
+		}
+	}
+}
+
+// TestDashboardBoardRender renders the board in dashboard mode (TASK-015) and
+// checks the blocked badge, group chip, ticket-chip links, and the absence of a
+// spurious no-ac badge / internal id link.
+func TestDashboardBoardRender(t *testing.T) {
+	srv := NewServer(Areas{
+		KnowledgeDir:  "testdata/dashboard",
+		DashboardFile: "testdata/dashboard/work.md",
+		LinkBase:      "https://linear.app/acme/issue/",
+	})
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if rec.Code != 200 {
+		t.Fatalf("board status %d", rec.Code)
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, ">blocked<") {
+		t.Error("board missing a blocked badge (Alpha/Zeta are blocked)")
+	}
+	if !strings.Contains(body, "Product / code") {
+		t.Error("board missing the 'Product / code' group chip")
+	}
+	if !strings.Contains(body, `href="https://linear.app/acme/issue/PINATA-100"`) {
+		t.Error("board missing a ticket chip linking to the configured Linear base")
+	}
+	// Dashboard In-Progress cards are AC-less + id-less: no no-ac badge, and no
+	// internal /<id> detail anchor (only external ticket links).
+	if strings.Contains(body, ">no-ac<") {
+		t.Error("dashboard cards must not carry a no-ac badge")
+	}
+	if strings.Contains(body, `href="/PINATA-100"`) {
+		t.Error("dashboard cards must not emit an internal /<id> link")
+	}
+}
+
+// TestDashboardBadges asserts the positive AND negative of the badge rules:
+// blocked cards get the badge, non-blocked ones don't, and dashboard cards
+// never get the framework-only no-ac badge.
+func TestDashboardBadges(t *testing.T) {
+	b, err := NewParser().Parse(Areas{KnowledgeDir: "testdata/dashboard", DashboardFile: "testdata/dashboard/work.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := func(title string) []string {
+		for _, c := range b.Cards {
+			if c.Title == title {
+				var k []string
+				for _, bd := range c.Badges {
+					k = append(k, bd.Kind)
+				}
+				return k
+			}
+		}
+		t.Fatalf("no card %q", title)
+		return nil
+	}
+	has := func(ks []string, want string) bool {
+		for _, k := range ks {
+			if k == want {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(kinds("Alpha task"), "blocked") {
+		t.Error("Alpha (leading ⛔) should have a blocked badge")
+	}
+	if has(kinds("Beta task (PINATA-200)"), "blocked") {
+		t.Error("Beta (not blocked) must not have a blocked badge")
+	}
+	if has(kinds("Alpha task"), "no-ac") {
+		t.Error("dashboard cards must never get the framework no-ac badge")
 	}
 }
 
