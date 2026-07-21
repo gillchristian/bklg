@@ -191,6 +191,10 @@ func TestDashboardBoardRender(t *testing.T) {
 	if strings.Contains(body, `href="/PINATA-100"`) {
 		t.Error("dashboard cards must not emit an internal /<id> link")
 	}
+	// Instead, the card title links to its slug detail page (TASK-016).
+	if !strings.Contains(body, `href="/alpha-task"`) {
+		t.Error("board should link a dashboard card title to its /<slug> detail page")
+	}
 }
 
 // TestDashboardBadges asserts the positive AND negative of the badge rules:
@@ -230,6 +234,65 @@ func TestDashboardBadges(t *testing.T) {
 	}
 	if has(kinds("Alpha task"), "no-ac") {
 		t.Error("dashboard cards must never get the framework no-ac badge")
+	}
+}
+
+func TestSlugify(t *testing.T) {
+	cases := map[string]string{
+		"Alpha task":              "alpha-task",
+		"Form Building UI (C4)!":  "form-building-ui-c4",
+		"  spaced  out  ":         "spaced-out",
+		"PINATA-599 & PINATA-601": "pinata-599-pinata-601",
+		"!!!":                     "",
+	}
+	for in, want := range cases {
+		if got := slugify(in); got != want {
+			t.Errorf("slugify(%q) = %q, want %q", in, got, want)
+		}
+	}
+	// Uniqueness: duplicate titles get distinct slugs; empty falls back to card.
+	cards := []Card{{Title: "Same Title"}, {Title: "Same Title"}, {Title: "!!!"}}
+	assignSlugs(cards)
+	if cards[0].Slug == cards[1].Slug {
+		t.Errorf("duplicate titles got the same slug %q", cards[0].Slug)
+	}
+	if cards[2].Slug == "" {
+		t.Error("empty-slug title should fall back to a non-empty slug")
+	}
+}
+
+// TestDashboardDetail renders a dashboard card's detail page via its slug route
+// (TASK-016): title, ticket links (to the configured base), material, status;
+// and an unknown slug 404s.
+func TestDashboardDetail(t *testing.T) {
+	srv := NewServer(Areas{
+		KnowledgeDir:  "testdata/dashboard",
+		DashboardFile: "testdata/dashboard/work.md",
+		LinkBase:      "https://linear.app/acme/issue/",
+	})
+	get := func(path string) (int, string) {
+		rec := httptest.NewRecorder()
+		srv.Routes().ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		return rec.Code, rec.Body.String()
+	}
+
+	code, body := get("/alpha-task") // slugify("Alpha task")
+	if code != 200 {
+		t.Fatalf("/alpha-task status %d, want 200", code)
+	}
+	for _, want := range []string{
+		"Alpha task", // title
+		`href="https://linear.app/acme/issue/PINATA-100"`, // ticket chip on detail (taskVM.LinearBase)
+		"Status / next step",                              // status section label
+		"Blocked on PINATA-100",                           // status prose
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("/alpha-task detail missing %q", want)
+		}
+	}
+
+	if code, _ := get("/no-such-slug"); code != 404 {
+		t.Errorf("/no-such-slug status %d, want 404", code)
 	}
 }
 

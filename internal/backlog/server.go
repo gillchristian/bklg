@@ -129,7 +129,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 // parking/id-less card) is a 404.
 func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	b := s.board()
-	card, ok := b.CardByRawID(r.PathValue("id"))
+	card, ok := b.CardByRoute(r.PathValue("id"))
 	if !ok {
 		http.NotFound(w, r)
 		return

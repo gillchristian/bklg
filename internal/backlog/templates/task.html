@@ -12,6 +12,22 @@
   </h1>
   <p class="text-sm text-gray-500 mt-0.5">{{.Card.Column}}{{with .Card.ID}} · namespace {{.Namespace}}{{end}}</p>
 
+  {{if .Card.Dashboard}}
+  {{if .Card.Subtitle}}<p class="mt-3 text-sm text-gray-700">{{md .Card.Subtitle}}</p>{{end}}
+  {{if .Card.Tickets}}
+  <div class="mt-4">
+    <h2 class="text-sm font-medium mb-1">Tickets</h2>
+    <div class="flex flex-wrap gap-1">
+      {{range .Card.Tickets}}<a href="{{ticketURL $.LinearBase .Raw}}" target="_blank" rel="noopener" class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-600/20 hover:bg-blue-100">{{.Raw}}</a>{{end}}
+    </div>
+  </div>
+  {{end}}
+  {{if .Card.Material}}<p class="mt-4 text-sm"><span class="font-medium">Material:</span> {{md .Card.Material}}</p>{{end}}
+  {{if .Card.Status}}<div class="mt-4 text-sm"><span class="font-medium">Status / next step:</span>
+    <div class="whitespace-pre-wrap text-gray-700 mt-0.5">{{md .Card.Status}}</div>
+  </div>{{end}}
+  {{end}}
+
   {{if .Card.Source}}<p class="mt-4 text-sm"><span class="font-medium">Source:</span> {{md .Card.Source}}</p>{{end}}
 
   {{if .Card.Acceptance}}

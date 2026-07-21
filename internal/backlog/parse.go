@@ -65,7 +65,44 @@ func parseDashboard(a Areas) (Board, error) {
 		}
 	}
 	computeDashboardBadges(b.Cards)
+	assignSlugs(b.Cards)
 	return b, nil
+}
+
+// assignSlugs gives each card a unique url-safe slug from its title (the
+// dashboard detail-route key). Collisions get a -2, -3 … suffix; the used-set
+// guard keeps a title that literally slugifies to "foo-2" from clashing.
+func assignSlugs(cards []Card) {
+	used := map[string]bool{}
+	for i := range cards {
+		base := slugify(cards[i].Title)
+		if base == "" {
+			base = "card"
+		}
+		s := base
+		for n := 2; used[s]; n++ {
+			s = base + "-" + strconv.Itoa(n)
+		}
+		used[s] = true
+		cards[i].Slug = s
+	}
+}
+
+// slugify lowercases s and collapses each run of non-alphanumeric characters to
+// a single hyphen, trimming leading/trailing hyphens.
+func slugify(s string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			dash = false
+		} else if b.Len() > 0 && !dash {
+			b.WriteByte('-')
+			dash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
 
 // computeDashboardBadges attaches the dashboard-mode chips: a red blocked badge

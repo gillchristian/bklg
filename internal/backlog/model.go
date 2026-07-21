@@ -83,6 +83,7 @@ type Card struct {
 	Material  string // the row's Material/Record cell (raw markdown, e.g. "[x](y)")
 	Status    string // the row's Status/next-step cell (Active), unescaped; "" for Done/Backlog
 	Blocked   bool   // a leading ⛔ / **Blocked** marker (dashboard's blocked signal)
+	Slug      string // url-safe detail-route key derived from Title (dashboard mode)
 }
 
 // Blocker is a parsed blockers.md entry (spec §4). Populated in TASK-004.
@@ -120,12 +121,22 @@ type Board struct {
 	Meta     Meta
 }
 
-// CardByRawID returns the card whose id matches raw (case-insensitively, per the
-// D2 route-key decision). Parking/id-less cards have no id and never match, so
-// they have no detail page.
-func (b *Board) CardByRawID(raw string) (*Card, bool) {
+// RouteKey is the card's detail-page path segment: the raw id for framework
+// cards, the title slug for dashboard cards (which have no id). It is "" for a
+// framework parking-lot card with no id — such a card has no detail page.
+func (c Card) RouteKey() string {
+	if c.ID != nil {
+		return c.ID.Raw
+	}
+	return c.Slug
+}
+
+// CardByRoute returns the card whose RouteKey matches key case-insensitively
+// (per the D2 route-key decision). Cards with no route key never match, so they
+// have no detail page.
+func (b *Board) CardByRoute(key string) (*Card, bool) {
 	for i := range b.Cards {
-		if b.Cards[i].ID != nil && strings.EqualFold(b.Cards[i].ID.Raw, raw) {
+		if rk := b.Cards[i].RouteKey(); rk != "" && strings.EqualFold(rk, key) {
 			return &b.Cards[i], true
 		}
 	}
