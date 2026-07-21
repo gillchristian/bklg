@@ -24,8 +24,9 @@
         </div>
         {{end}}
         <div class="text-sm leading-snug">
-          {{if .ID}}<a class="font-mono text-xs text-blue-700 hover:underline" href="/{{.ID.Raw}}">{{.ID.Raw}}</a>
-          <span class="text-gray-400">·</span> {{end}}<span>{{md (truncate .Title 140)}}</span>
+          {{if .ID}}<a class="font-mono text-xs text-blue-700 hover:underline" href="/{{.ID.Raw}}">{{.ID.Raw}}</a> <span class="text-gray-400">·</span> <span>{{md (truncate .Title 140)}}</span>
+          {{else if .Dashboard}}<a class="text-blue-700 hover:underline" href="/{{.Slug}}">{{md (truncate .Title 140)}}</a>
+          {{else}}<span>{{md (truncate .Title 140)}}</span>{{end}}
         </div>
         {{if .Subtitle}}<div class="text-xs text-gray-500 leading-snug mt-0.5">{{md (truncate .Subtitle 120)}}</div>{{end}}
         {{if .Tickets}}
